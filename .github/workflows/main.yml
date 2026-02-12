@@ -1,0 +1,59 @@
+name: Build GKI 5.10 Kernel
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - android13-5.10
+      - android12-5.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            bc bison flex curl zip git \
+            build-essential libssl-dev \
+            libelf-dev ccache
+
+      - name: Clone Proton Clang
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
+
+      - name: Setup build env
+        run: |
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "SUBARCH=arm64" >> $GITHUB_ENV
+          echo "PATH=$GITHUB_WORKSPACE/clang/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Build Kernel
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
+
+          mkdir -p out
+
+          make O=out gki_defconfig
+
+          make -j$(nproc) O=out \
+            CC=clang \
+            LLVM=1 \
+            LLVM_IAS=1
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: GKI-Kernel
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/Image.gz-dtb
