@@ -1,41 +1,72 @@
-name: Check Clang Version
+name: Build test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
+  watch:
+    types: [started]
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  check-clang:
+  buildtest:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone azure-clang
+      - name: Clone Kernel Source
         run: |
-          git clone https://gitlab.com/Panchajanya1999/azure-clang.git clang-repo
+          git clone --depth=1 https://github.com/ItoRenz-Build/kernel_xiaomi_msm8937.git kernel
+          cd kernel
 
-      - name: List repository contents (debug)
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Install Packages
         run: |
-          cd clang-repo
-          ls -la
-          find . -maxdepth 3 -type f
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            dialog bash sed wget git curl zip tar jq expect make cmake automake autoconf \
+            llvm lld clang gcc binutils bison perl gperf gawk flex bc python3 zstd \
+            openssl unzip cpio build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
-      - name: Detect & Print Clang Version
+      - name: Clone Azure Clang
         run: |
-          cd clang-repo
+          cd kernel
+          git clone --depth=1 https://gitlab.com/Panchajanya1999/azure-clang.git
+          
+      - name: Start Build (with log)
+        run: |
+          cd kernel
+          mkdir -p logs
+          bash build.sh 2>&1 | tee logs/build.txt
 
-          echo "Searching for clang binary..."
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: kernel/logs/build.txt
 
-          if [ -f "./bin/clang" ]; then
-            chmod +x ./bin/clang
-            ./bin/clang --version
-          elif [ -f "./clang" ]; then
-            chmod +x ./clang
-            ./clang --version
-          elif command -v clang >/dev/null 2>&1; then
-            echo "Fallback to system clang:"
-            clang --version
-          else
-            echo "ERROR: Clang binary not found."
-            exit 1
-          fi
+      - name: Upload AnyKernel Zip
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anykernel-zip
+          path: kernel/AnyKernel/*.zip
+
+      - name: Upload Kernel Image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-gz
+          path: kernel/out/arch/arm64/boot/Image.gz
+
+      - name: Upload DTB
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-gz-dtb
+          path: kernel/out/arch/arm64/boot/Image.gz-dtb
