@@ -1,7 +1,7 @@
 name: Build test
 
 on:
-  workflow_dispatch:
+ workflow_dispatch:
   watch:
     types: [started]
 
@@ -17,7 +17,6 @@ jobs:
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 https://github.com/ItoRenz-Build/kernel_xiaomi_msm8937.git kernel
-          cd kernel
 
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
@@ -36,12 +35,19 @@ jobs:
         run: |
           cd kernel
           git clone --depth=1 https://gitlab.com/Panchajanya1999/azure-clang.git
-          
+
+      # 🔥 Ambil build.sh dari repo kamu
+      - name: Fetch build.sh
+        run: |
+          cd kernel
+          wget -q https://raw.githubusercontent.com/rahmatsobrian/action-everything/main/build.sh
+          chmod +x build.sh
+
       - name: Start Build (with log)
         run: |
           cd kernel
           mkdir -p logs
-          bash build.sh 2>&1 | tee logs/build.txt
+          ./build.sh 2>&1 | tee logs/build.txt
 
       - name: Upload Build Log
         if: always()
