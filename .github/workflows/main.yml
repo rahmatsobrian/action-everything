@@ -1,78 +1,316 @@
-name: Build test
+name: Kernel Build CI
 
 on:
- workflow_dispatch:
+  workflow_dispatch:
+    inputs:
+      KERNEL_BRANCH:
+        description: "Kernel Branch"
+        required: true
+        default: "a13/master"
+      KERNEL_REPO:
+        description: "Kernel Repository URL"
+        required: true
+        default: "https://github.com/mi-msm8937/android_kernel_xiaomi_msm8937.git"
+      DEFCONFIG:
+        description: "Defconfig name"
+        required: true
+        default: "msm8937_defconfig"
+      ENABLE_KERNELSU:
+        description: "Enable KernelSU-Next?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      ENABLE_CCACHE:
+        description: "Enable ccache for faster rebuilds?"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
   watch:
     types: [started]
+
+env:
+  KERNEL_REPO: ${{ github.event.inputs.KERNEL_REPO || 'https://github.com/mi-msm8937/android_kernel_xiaomi_msm8937.git' }}
+  KERNEL_BRANCH: ${{ github.event.inputs.KERNEL_BRANCH || 'a13/master' }}
+  DEFCONFIG: ${{ github.event.inputs.DEFCONFIG || 'msm8937_defconfig' }}
+  ENABLE_KERNELSU: ${{ github.event.inputs.ENABLE_KERNELSU || 'false' }}
+  ENABLE_CCACHE: ${{ github.event.inputs.ENABLE_CCACHE || 'true' }}
+  ARCH: arm64
+  SUBARCH: arm64
+  CROSS_COMPILE: aarch64-linux-gnu-
+  CROSS_COMPILE_ARM32: arm-linux-gnueabihf-
+  KERNEL_DIR: ${{ github.workspace }}/kernel_source
+  OUT_DIR: ${{ github.workspace }}/out
+  ANYKERNEL_DIR: ${{ github.workspace }}/AnyKernel3
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  buildtest:
+  build:
+    name: 🔨 Build Kernel
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone Kernel Source
-        run: |
-          git clone --depth=1 https://github.com/ItoRenz-Build/kernel_xiaomi_msm8937.git kernel
+      # ─────────────────────────────────────────────
+      # 1. Checkout this repo (for scripts / AnyKernel)
+      # ─────────────────────────────────────────────
+      - name: 📥 Checkout CI Repo
+        uses: actions/checkout@v4
+        with:
+          path: ci
 
-      - name: Set Swap Space
+      # ─────────────────────────────────────────────
+      # 2. Swap Space
+      # ─────────────────────────────────────────────
+      - name: 💾 Set Swap Space (10 GB)
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
 
-      - name: Install Packages
+      # ─────────────────────────────────────────────
+      # 3. Install Build Dependencies
+      # ─────────────────────────────────────────────
+      - name: 📦 Install Build Dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
-            dialog bash sed wget git curl zip tar jq expect make cmake automake autoconf \
-            llvm lld clang gcc binutils bison perl gperf gawk flex bc python3 zstd \
-            openssl unzip cpio build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+            dialog bash sed wget git curl zip tar jq expect make cmake \
+            automake autoconf llvm lld lldb clang gcc binutils bison perl \
+            gperf gawk flex bc python3 python3-pip zstd openssl unzip cpio \
+            build-essential ccache liblz4-tool libsdl1.2-dev libstdc++6 \
+            libxml2 libxml2-utils lzop pngcrush schedtool squashfs-tools \
+            xsltproc zlib1g-dev libncurses5-dev bzip2 dos2unix kmod \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf gcc-arm-linux-gnueabi \
+            binutils-aarch64-linux-gnu binutils-arm-linux-gnueabihf \
+            device-tree-compiler
 
-      - name: Clone Azure Clang
+      # ─────────────────────────────────────────────
+      # 4. ccache Setup
+      # ─────────────────────────────────────────────
+      - name: ⚡ Setup ccache
+        if: env.ENABLE_CCACHE == 'true'
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: "5G"
+          key: kernel-gcc-${{ env.KERNEL_BRANCH }}-${{ env.DEFCONFIG }}
+
+      - name: 🔧 Configure ccache PATH
+        if: env.ENABLE_CCACHE == 'true'
         run: |
-          cd kernel
-          git clone --depth=1 https://gitlab.com/Panchajanya1999/azure-clang.git
+          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          echo "CCACHE_EXEC=$(which ccache)" >> $GITHUB_ENV
+          ccache --version
 
-      # 🔥 Ambil build.sh dari repo kamu
-      - name: Fetch build.sh
+      # ─────────────────────────────────────────────
+      # 5. Clone Kernel Source
+      # ─────────────────────────────────────────────
+      - name: 🌀 Clone Kernel Source
         run: |
-          cd kernel
-          wget -q https://raw.githubusercontent.com/rahmatsobrian/action-everything/main/build.sh
-          chmod +x build.sh
+          echo "::group::Cloning $KERNEL_REPO @ $KERNEL_BRANCH"
+          git clone \
+            --depth=1 \
+            --branch "$KERNEL_BRANCH" \
+            "$KERNEL_REPO" \
+            "$KERNEL_DIR"
+          echo "::endgroup::"
 
-      - name: Start Build (with log)
+          cd "$KERNEL_DIR"
+          echo "KERNEL_VERSION=$(make kernelversion 2>/dev/null || echo 'unknown')" >> $GITHUB_ENV
+          echo "KERNEL_COMMIT=$(git log --oneline -1)" >> $GITHUB_ENV
+          echo "KERNEL_COMMIT_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      # ─────────────────────────────────────────────
+      # 6. Optional: KernelSU-Next
+      # ─────────────────────────────────────────────
+      - name: 🔑 Setup KernelSU-Next
+        if: env.ENABLE_KERNELSU == 'true'
+        working-directory: ${{ env.KERNEL_DIR }}
         run: |
-          cd kernel
-          mkdir -p logs
-          ./build.sh 2>&1 | tee logs/build.txt
+          echo "::group::Integrating KernelSU-Next"
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          echo "::endgroup::"
 
-      - name: Upload Build Log
+      # ─────────────────────────────────────────────
+      # 7. Print Build Info
+      # ─────────────────────────────────────────────
+      - name: ℹ️ Print Build Information
+        run: |
+          echo "================================================"
+          echo "  Kernel Repo    : $KERNEL_REPO"
+          echo "  Branch         : $KERNEL_BRANCH"
+          echo "  Kernel Version : $KERNEL_VERSION"
+          echo "  Commit         : $KERNEL_COMMIT"
+          echo "  Defconfig      : $DEFCONFIG"
+          echo "  Arch           : $ARCH"
+          echo "  GCC (aarch64)  : $(aarch64-linux-gnu-gcc --version | head -1)"
+          echo "  GCC (arm32)    : $(arm-linux-gnueabihf-gcc --version | head -1)"
+          echo "  ccache         : $ENABLE_CCACHE"
+          echo "  KernelSU       : $ENABLE_KERNELSU"
+          echo "================================================"
+
+      # ─────────────────────────────────────────────
+      # 8. Generate Defconfig
+      # ─────────────────────────────────────────────
+      - name: ⚙️ Generate Defconfig
+        working-directory: ${{ env.KERNEL_DIR }}
+        run: |
+          mkdir -p "$OUT_DIR"
+          make \
+            O="$OUT_DIR" \
+            ARCH=$ARCH \
+            SUBARCH=$SUBARCH \
+            CROSS_COMPILE=$CROSS_COMPILE \
+            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+            $DEFCONFIG
+
+      # ─────────────────────────────────────────────
+      # 9. Build Kernel
+      # ─────────────────────────────────────────────
+      - name: 🔨 Build Kernel (GCC)
+        working-directory: ${{ env.KERNEL_DIR }}
+        run: |
+          mkdir -p "${{ github.workspace }}/logs"
+
+          BUILD_START=$(date +"%s")
+
+          make \
+            O="$OUT_DIR" \
+            ARCH=$ARCH \
+            SUBARCH=$SUBARCH \
+            CROSS_COMPILE=$CROSS_COMPILE \
+            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+            -j$(nproc --all) \
+            2>&1 | tee "${{ github.workspace }}/logs/build.log"
+
+          BUILD_END=$(date +"%s")
+          BUILD_DIFF=$((BUILD_END - BUILD_START))
+          echo "BUILD_TIME=$(( BUILD_DIFF / 60 ))m $(( BUILD_DIFF % 60 ))s" >> $GITHUB_ENV
+          echo "✅ Build completed in $(( BUILD_DIFF / 60 ))m $(( BUILD_DIFF % 60 ))s"
+
+      # ─────────────────────────────────────────────
+      # 10. Verify Kernel Output
+      # ─────────────────────────────────────────────
+      - name: ✅ Verify Kernel Output
+        id: verify
+        run: |
+          BOOT_DIR="$OUT_DIR/arch/arm64/boot"
+          FOUND=0
+
+          for img in Image Image.gz Image.gz-dtb Image-dtb; do
+            if [ -f "$BOOT_DIR/$img" ]; then
+              echo "✅ Found: $img ($(du -sh $BOOT_DIR/$img | cut -f1))"
+              FOUND=1
+            fi
+          done
+
+          if [ $FOUND -eq 0 ]; then
+            echo "❌ No kernel image found! Build may have failed."
+            exit 1
+          fi
+
+      # ─────────────────────────────────────────────
+      # 11. Package AnyKernel Zip
+      # ─────────────────────────────────────────────
+      - name: 📦 Package AnyKernel3 Zip
+        run: |
+          # Clone AnyKernel3 if not present in CI repo
+          if [ ! -d "$ANYKERNEL_DIR" ]; then
+            git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$ANYKERNEL_DIR"
+          fi
+
+          BOOT_DIR="$OUT_DIR/arch/arm64/boot"
+
+          # Copy available kernel images
+          for img in Image Image.gz Image.gz-dtb Image-dtb; do
+            [ -f "$BOOT_DIR/$img" ] && cp "$BOOT_DIR/$img" "$ANYKERNEL_DIR/"
+          done
+
+          # Copy DTBs if present
+          if [ -d "$BOOT_DIR/dts" ]; then
+            find "$BOOT_DIR/dts" -name "*.dtb" -exec cp {} "$ANYKERNEL_DIR/dtbs/" \; 2>/dev/null || true
+          fi
+
+          ZIP_NAME="Kernel-msm8937-GCC-$(date +%Y%m%d-%H%M)-${KERNEL_COMMIT_SHORT}.zip"
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+          cd "$ANYKERNEL_DIR"
+          zip -r9 "${{ github.workspace }}/$ZIP_NAME" . \
+            -x '*.git*' -x 'README.md' -x '*placeholder'
+
+          echo "✅ AnyKernel zip created: $ZIP_NAME"
+          ls -lh "${{ github.workspace }}/$ZIP_NAME"
+
+      # ─────────────────────────────────────────────
+      # 12. Upload Artifacts
+      # ─────────────────────────────────────────────
+      - name: 📤 Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: kernel/logs/build.txt
+          path: logs/build.log
+          retention-days: 7
 
-      - name: Upload AnyKernel Zip
+      - name: 📤 Upload AnyKernel Zip
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: anykernel-zip
-          path: kernel/AnyKernel/*.zip
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ github.workspace }}/${{ env.ZIP_NAME }}
+          retention-days: 30
 
-      - name: Upload Kernel Image
+      - name: 📤 Upload Image.gz
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: image-gz
-          path: kernel/out/arch/arm64/boot/Image.gz
+          name: Image.gz
+          path: ${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz
+          if-no-files-found: ignore
+          retention-days: 30
 
-      - name: Upload DTB
+      - name: 📤 Upload Image.gz-dtb
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: image-gz-dtb
-          path: kernel/out/arch/arm64/boot/Image.gz-dtb
+          name: Image.gz-dtb
+          path: ${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz-dtb
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 📤 Upload Image (raw)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image
+          path: ${{ env.OUT_DIR }}/arch/arm64/boot/Image
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # ─────────────────────────────────────────────
+      # 13. Build Summary
+      # ─────────────────────────────────────────────
+      - name: 📋 Build Summary
+        if: always()
+        run: |
+          echo "## 🔨 Kernel Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Repo** | \`$KERNEL_REPO\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`$KERNEL_BRANCH\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | \`$KERNEL_VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`$KERNEL_COMMIT\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Defconfig** | \`$DEFCONFIG\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Compiler** | GCC (aarch64-linux-gnu) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Build Time** | \`$BUILD_TIME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **KernelSU** | \`$ENABLE_KERNELSU\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **ccache** | \`$ENABLE_CCACHE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **ZIP** | \`$ZIP_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          
