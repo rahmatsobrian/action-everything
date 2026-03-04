@@ -14,7 +14,7 @@ on:
       DEFCONFIG:
         description: "Defconfig name"
         required: true
-        default: "msm8937_defconfig"
+        default: "mi8937_defconfig"
       COMPILER:
         description: "Compiler to use"
         required: true
@@ -24,15 +24,9 @@ on:
           - "clang"
           - "gcc"
       CLANG_VERSION:
-        description: "Clang version (only used if COMPILER=clang)"
-        required: true
-        default: "17"
-        type: choice
-        options:
-          - "14"
-          - "15"
-          - "16"
-          - "17"
+        description: "ZyCromerZ Clang version tag (e.g. 20.0.0git-20250101)"
+        required: false
+        default: "latest"
       ENABLE_KERNELSU:
         description: "Enable KernelSU-Next?"
         required: true
@@ -110,26 +104,56 @@ jobs:
             ccache
 
       # ──────────────────────────────────────────
-      # 4a. Install Clang (if COMPILER=clang)
+      # 4a. Download ZyCromerZ Clang (if COMPILER=clang)
       # ──────────────────────────────────────────
-      - name: 🦾 Install Clang ${{ env.CLANG_VERSION }}
+      - name: 🦾 Download ZyCromerZ Clang
         if: env.COMPILER == 'clang'
         run: |
-          sudo apt-get install -y \
-            clang-${{ env.CLANG_VERSION }} \
-            lld-${{ env.CLANG_VERSION }} \
-            llvm-${{ env.CLANG_VERSION }}
+          echo "::group::Fetching ZyCromerZ Clang release info"
 
-          # Make clang/lld/llvm available without version suffix
-          sudo update-alternatives --install /usr/bin/clang      clang      /usr/bin/clang-${{ env.CLANG_VERSION }}      100
-          sudo update-alternatives --install /usr/bin/ld.lld     ld.lld     /usr/bin/ld.lld-${{ env.CLANG_VERSION }}     100
-          sudo update-alternatives --install /usr/bin/llvm-ar    llvm-ar    /usr/bin/llvm-ar-${{ env.CLANG_VERSION }}    100
-          sudo update-alternatives --install /usr/bin/llvm-nm    llvm-nm    /usr/bin/llvm-nm-${{ env.CLANG_VERSION }}    100
-          sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-${{ env.CLANG_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/llvm-objcopy llvm-objcopy /usr/bin/llvm-objcopy-${{ env.CLANG_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/llvm-objdump llvm-objdump /usr/bin/llvm-objdump-${{ env.CLANG_VERSION }} 100
+          ZYCROMERZ_API="https://api.github.com/repos/ZyCromerZ/Clang/releases"
 
-          clang --version
+          if [ "${{ env.CLANG_VERSION }}" = "latest" ]; then
+            echo "📡 Fetching latest release..."
+            RELEASE_DATA=$(curl -sf "$ZYCROMERZ_API/latest")
+          else
+            echo "📡 Fetching release tag: ${{ env.CLANG_VERSION }}"
+            RELEASE_DATA=$(curl -sf "$ZYCROMERZ_API/tags/${{ env.CLANG_VERSION }}")
+          fi
+
+          # Extract tarball download URL (prefer .tar.gz)
+          CLANG_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -1)
+          CLANG_TAG=$(echo "$RELEASE_DATA" | jq -r '.tag_name')
+          CLANG_NAME=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .name' | head -1)
+
+          if [ -z "$CLANG_URL" ]; then
+            echo "❌ Could not find .tar.gz asset in release!"
+            exit 1
+          fi
+
+          echo "📦 Clang Tag    : $CLANG_TAG"
+          echo "📦 Asset Name   : $CLANG_NAME"
+          echo "🔗 Download URL : $CLANG_URL"
+          echo "::endgroup::"
+
+          echo "::group::Downloading and extracting Clang"
+          mkdir -p "${{ github.workspace }}/clang"
+          curl -L "$CLANG_URL" | tar -xz -C "${{ github.workspace }}/clang" --strip-components=1
+          echo "::endgroup::"
+
+          # Export path so all subsequent steps can find it
+          CLANG_BIN="${{ github.workspace }}/clang/bin"
+          CLANG_LIB="${{ github.workspace }}/clang/lib"
+
+          echo "CLANG_DIR=${{ github.workspace }}/clang"  >> $GITHUB_ENV
+          echo "CLANG_BIN=$CLANG_BIN"                     >> $GITHUB_ENV
+          echo "PATH=$CLANG_BIN:$PATH"                    >> $GITHUB_ENV
+          echo "CLANG_TAG=$CLANG_TAG"                     >> $GITHUB_ENV
+
+          # Verify
+          export PATH="$CLANG_BIN:$PATH"
+          echo "✅ Clang: $(clang --version | head -1)"
+          echo "✅ LLD  : $(ld.lld --version | head -1)"
 
       # ──────────────────────────────────────────
       # 4b. Check GCC compatibility (if COMPILER=gcc)
@@ -156,7 +180,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           max-size: "5G"
-          key: kernel-${{ env.COMPILER }}-${{ env.KERNEL_BRANCH }}-${{ env.DEFCONFIG }}
+          key: kernel-${{ env.COMPILER }}-${{ env.KERNEL_BRANCH }}-${{ env.DEFCONFIG }}-${{ env.CLANG_TAG }}
 
       - name: 🔧 Add ccache to PATH
         if: env.ENABLE_CCACHE == 'true'
@@ -262,6 +286,7 @@ jobs:
           echo "  Arch        : $ARCH"
           echo "  Compiler    : $COMPILER"
           if [ "$COMPILER" = "clang" ]; then
+            echo "  Clang Tag   : $CLANG_TAG"
             echo "  Clang       : $(clang --version | head -1)"
             echo "  LLD         : $(ld.lld --version | head -1)"
           else
@@ -414,6 +439,7 @@ jobs:
           echo "| **Commit** | \`$KERNEL_COMMIT\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Defconfig** | \`$DEFCONFIG\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Compiler** | \`$COMPILER\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Clang Tag** | \`$CLANG_TAG\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Build Time** | \`$BUILD_TIME\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **KernelSU** | \`$ENABLE_KERNELSU\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **ZIP** | \`$ZIP_NAME\` |" >> $GITHUB_STEP_SUMMARY
