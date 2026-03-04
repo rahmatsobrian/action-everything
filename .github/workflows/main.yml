@@ -15,6 +15,24 @@ on:
         description: "Defconfig name"
         required: true
         default: "msm8937_defconfig"
+      COMPILER:
+        description: "Compiler to use"
+        required: true
+        default: "clang"
+        type: choice
+        options:
+          - "clang"
+          - "gcc"
+      CLANG_VERSION:
+        description: "Clang version (only used if COMPILER=clang)"
+        required: true
+        default: "17"
+        type: choice
+        options:
+          - "14"
+          - "15"
+          - "16"
+          - "17"
       ENABLE_KERNELSU:
         description: "Enable KernelSU-Next?"
         required: true
@@ -24,7 +42,7 @@ on:
           - "true"
           - "false"
       ENABLE_CCACHE:
-        description: "Enable ccache for faster rebuilds?"
+        description: "Enable ccache?"
         required: true
         default: "true"
         type: choice
@@ -38,12 +56,12 @@ env:
   KERNEL_REPO: ${{ github.event.inputs.KERNEL_REPO || 'https://github.com/mi-msm8937/android_kernel_xiaomi_msm8937.git' }}
   KERNEL_BRANCH: ${{ github.event.inputs.KERNEL_BRANCH || 'a13/master' }}
   DEFCONFIG: ${{ github.event.inputs.DEFCONFIG || 'msm8937_defconfig' }}
+  COMPILER: ${{ github.event.inputs.COMPILER || 'clang' }}
+  CLANG_VERSION: ${{ github.event.inputs.CLANG_VERSION || '17' }}
   ENABLE_KERNELSU: ${{ github.event.inputs.ENABLE_KERNELSU || 'false' }}
   ENABLE_CCACHE: ${{ github.event.inputs.ENABLE_CCACHE || 'true' }}
   ARCH: arm64
   SUBARCH: arm64
-  CROSS_COMPILE: aarch64-linux-gnu-
-  CROSS_COMPILE_ARM32: arm-linux-gnueabihf-
   KERNEL_DIR: ${{ github.workspace }}/kernel_source
   OUT_DIR: ${{ github.workspace }}/out
   ANYKERNEL_DIR: ${{ github.workspace }}/AnyKernel3
@@ -54,63 +72,99 @@ defaults:
 
 jobs:
   build:
-    name: 🔨 Build Kernel
-    runs-on: ubuntu-latest
+    name: "🔨 Build Kernel (${{ github.event.inputs.COMPILER || 'clang' }})"
+    runs-on: ubuntu-22.04        # pin to 22.04 for stable toolchain compatibility
 
     steps:
-      # ─────────────────────────────────────────────
-      # 1. Checkout this repo (for scripts / AnyKernel)
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 1. Checkout CI Repo
+      # ──────────────────────────────────────────
       - name: 📥 Checkout CI Repo
         uses: actions/checkout@v4
         with:
           path: ci
 
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
       # 2. Swap Space
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
       - name: 💾 Set Swap Space (10 GB)
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
 
-      # ─────────────────────────────────────────────
-      # 3. Install Build Dependencies
-      # ─────────────────────────────────────────────
-      - name: 📦 Install Build Dependencies
+      # ──────────────────────────────────────────
+      # 3. Install Base Dependencies
+      # ──────────────────────────────────────────
+      - name: 📦 Install Base Build Dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
-            dialog bash sed wget git curl zip tar jq expect make cmake \
-            automake autoconf llvm lld lldb clang gcc binutils bison perl \
-            gperf gawk flex bc python3 python3-pip zstd openssl unzip cpio \
-            build-essential ccache liblz4-tool libsdl1.2-dev libstdc++6 \
-            libxml2 libxml2-utils lzop pngcrush schedtool squashfs-tools \
-            xsltproc zlib1g-dev libncurses5-dev bzip2 dos2unix kmod \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf gcc-arm-linux-gnueabi \
+            git curl wget zip unzip tar jq make cmake python3 \
+            bc bison flex gperf gawk perl cpio kmod dos2unix \
+            build-essential libncurses5-dev libssl-dev libelf-dev \
+            zlib1g-dev liblz4-tool lzop zstd bzip2 xz-utils \
+            device-tree-compiler libxml2-utils xsltproc \
+            squashfs-tools schedtool pngcrush \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
             binutils-aarch64-linux-gnu binutils-arm-linux-gnueabihf \
-            device-tree-compiler
+            ccache
 
-      # ─────────────────────────────────────────────
-      # 4. ccache Setup
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 4a. Install Clang (if COMPILER=clang)
+      # ──────────────────────────────────────────
+      - name: 🦾 Install Clang ${{ env.CLANG_VERSION }}
+        if: env.COMPILER == 'clang'
+        run: |
+          sudo apt-get install -y \
+            clang-${{ env.CLANG_VERSION }} \
+            lld-${{ env.CLANG_VERSION }} \
+            llvm-${{ env.CLANG_VERSION }}
+
+          # Make clang/lld/llvm available without version suffix
+          sudo update-alternatives --install /usr/bin/clang      clang      /usr/bin/clang-${{ env.CLANG_VERSION }}      100
+          sudo update-alternatives --install /usr/bin/ld.lld     ld.lld     /usr/bin/ld.lld-${{ env.CLANG_VERSION }}     100
+          sudo update-alternatives --install /usr/bin/llvm-ar    llvm-ar    /usr/bin/llvm-ar-${{ env.CLANG_VERSION }}    100
+          sudo update-alternatives --install /usr/bin/llvm-nm    llvm-nm    /usr/bin/llvm-nm-${{ env.CLANG_VERSION }}    100
+          sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-${{ env.CLANG_VERSION }} 100
+          sudo update-alternatives --install /usr/bin/llvm-objcopy llvm-objcopy /usr/bin/llvm-objcopy-${{ env.CLANG_VERSION }} 100
+          sudo update-alternatives --install /usr/bin/llvm-objdump llvm-objdump /usr/bin/llvm-objdump-${{ env.CLANG_VERSION }} 100
+
+          clang --version
+
+      # ──────────────────────────────────────────
+      # 4b. Check GCC compatibility (if COMPILER=gcc)
+      # ──────────────────────────────────────────
+      - name: 🔧 Check GCC Stack Protector Support
+        if: env.COMPILER == 'gcc'
+        run: |
+          GCC_VER=$(aarch64-linux-gnu-gcc --version | head -1)
+          echo "Using GCC: $GCC_VER"
+
+          if ! aarch64-linux-gnu-gcc -fstack-protector-strong -x c -c /dev/null -o /dev/null 2>/dev/null; then
+            echo "⚠️  -fstack-protector-strong NOT supported — will patch .config"
+            echo "GCC_NEEDS_STACKPROT_FIX=true" >> $GITHUB_ENV
+          else
+            echo "✅ -fstack-protector-strong supported"
+            echo "GCC_NEEDS_STACKPROT_FIX=false" >> $GITHUB_ENV
+          fi
+
+      # ──────────────────────────────────────────
+      # 5. ccache Setup
+      # ──────────────────────────────────────────
       - name: ⚡ Setup ccache
         if: env.ENABLE_CCACHE == 'true'
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           max-size: "5G"
-          key: kernel-gcc-${{ env.KERNEL_BRANCH }}-${{ env.DEFCONFIG }}
+          key: kernel-${{ env.COMPILER }}-${{ env.KERNEL_BRANCH }}-${{ env.DEFCONFIG }}
 
-      - name: 🔧 Configure ccache PATH
+      - name: 🔧 Add ccache to PATH
         if: env.ENABLE_CCACHE == 'true'
-        run: |
-          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
-          echo "CCACHE_EXEC=$(which ccache)" >> $GITHUB_ENV
-          ccache --version
+        run: echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
 
-      # ─────────────────────────────────────────────
-      # 5. Clone Kernel Source
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 6. Clone Kernel Source
+      # ──────────────────────────────────────────
       - name: 🌀 Clone Kernel Source
         run: |
           echo "::group::Cloning $KERNEL_REPO @ $KERNEL_BRANCH"
@@ -126,9 +180,9 @@ jobs:
           echo "KERNEL_COMMIT=$(git log --oneline -1)" >> $GITHUB_ENV
           echo "KERNEL_COMMIT_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      # ─────────────────────────────────────────────
-      # 6. Optional: KernelSU-Next
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 7. Optional: KernelSU-Next
+      # ──────────────────────────────────────────
       - name: 🔑 Setup KernelSU-Next
         if: env.ENABLE_KERNELSU == 'true'
         working-directory: ${{ env.KERNEL_DIR }}
@@ -137,119 +191,170 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           echo "::endgroup::"
 
-      # ─────────────────────────────────────────────
-      # 7. Print Build Info
-      # ─────────────────────────────────────────────
-      - name: ℹ️ Print Build Information
-        run: |
-          echo "================================================"
-          echo "  Kernel Repo    : $KERNEL_REPO"
-          echo "  Branch         : $KERNEL_BRANCH"
-          echo "  Kernel Version : $KERNEL_VERSION"
-          echo "  Commit         : $KERNEL_COMMIT"
-          echo "  Defconfig      : $DEFCONFIG"
-          echo "  Arch           : $ARCH"
-          echo "  GCC (aarch64)  : $(aarch64-linux-gnu-gcc --version | head -1)"
-          echo "  GCC (arm32)    : $(arm-linux-gnueabihf-gcc --version | head -1)"
-          echo "  ccache         : $ENABLE_CCACHE"
-          echo "  KernelSU       : $ENABLE_KERNELSU"
-          echo "================================================"
-
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
       # 8. Generate Defconfig
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
       - name: ⚙️ Generate Defconfig
         working-directory: ${{ env.KERNEL_DIR }}
         run: |
           mkdir -p "$OUT_DIR"
-          make \
-            O="$OUT_DIR" \
-            ARCH=$ARCH \
-            SUBARCH=$SUBARCH \
-            CROSS_COMPILE=$CROSS_COMPILE \
-            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
-            $DEFCONFIG
 
-      # ─────────────────────────────────────────────
-      # 9. Build Kernel
-      # ─────────────────────────────────────────────
-      - name: 🔨 Build Kernel (GCC)
+          if [ "$COMPILER" = "clang" ]; then
+            make \
+              O="$OUT_DIR" \
+              ARCH=$ARCH \
+              SUBARCH=$SUBARCH \
+              CC=clang \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+              $DEFCONFIG
+          else
+            make \
+              O="$OUT_DIR" \
+              ARCH=$ARCH \
+              SUBARCH=$SUBARCH \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+              $DEFCONFIG
+          fi
+
+      # ──────────────────────────────────────────
+      # 9. Patch .config for GCC Compatibility
+      # ──────────────────────────────────────────
+      - name: 🩹 Patch .config (GCC Stack Protector Fix)
+        if: env.COMPILER == 'gcc' && env.GCC_NEEDS_STACKPROT_FIX == 'true'
+        run: |
+          CONFIG_FILE="$OUT_DIR/.config"
+          echo "::group::Patching $CONFIG_FILE"
+
+          # Disable STRONG, try REGULAR
+          sed -i 's/CONFIG_CC_STACKPROTECTOR_STRONG=y/# CONFIG_CC_STACKPROTECTOR_STRONG is not set/' "$CONFIG_FILE"
+
+          if aarch64-linux-gnu-gcc -fstack-protector -x c -c /dev/null -o /dev/null 2>/dev/null; then
+            # Make sure REGULAR is set
+            grep -q "CONFIG_CC_STACKPROTECTOR_REGULAR" "$CONFIG_FILE" || \
+              echo "CONFIG_CC_STACKPROTECTOR_REGULAR=y" >> "$CONFIG_FILE"
+            echo "✅ Switched to CONFIG_CC_STACKPROTECTOR_REGULAR"
+          else
+            sed -i 's/CONFIG_CC_STACKPROTECTOR_REGULAR=y/# CONFIG_CC_STACKPROTECTOR_REGULAR is not set/' "$CONFIG_FILE" || true
+            echo "⚠️  Stack protector fully disabled"
+          fi
+
+          echo "::endgroup::"
+
+          # Re-sync the config to resolve any new dependencies
+          make -C "$KERNEL_DIR" O="$OUT_DIR" ARCH=$ARCH \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            olddefconfig
+
+      # ──────────────────────────────────────────
+      # 10. Print Build Info
+      # ──────────────────────────────────────────
+      - name: ℹ️ Print Build Info
+        run: |
+          echo "================================================"
+          echo "  Repo        : $KERNEL_REPO"
+          echo "  Branch      : $KERNEL_BRANCH"
+          echo "  Version     : $KERNEL_VERSION"
+          echo "  Commit      : $KERNEL_COMMIT"
+          echo "  Defconfig   : $DEFCONFIG"
+          echo "  Arch        : $ARCH"
+          echo "  Compiler    : $COMPILER"
+          if [ "$COMPILER" = "clang" ]; then
+            echo "  Clang       : $(clang --version | head -1)"
+            echo "  LLD         : $(ld.lld --version | head -1)"
+          else
+            echo "  GCC         : $(aarch64-linux-gnu-gcc --version | head -1)"
+          fi
+          echo "  Jobs        : $(nproc --all)"
+          echo "  ccache      : $ENABLE_CCACHE"
+          echo "  KernelSU    : $ENABLE_KERNELSU"
+          echo "================================================"
+
+      # ──────────────────────────────────────────
+      # 11. Build Kernel
+      # ──────────────────────────────────────────
+      - name: 🔨 Build Kernel
         working-directory: ${{ env.KERNEL_DIR }}
         run: |
           mkdir -p "${{ github.workspace }}/logs"
-
           BUILD_START=$(date +"%s")
 
-          make \
-            O="$OUT_DIR" \
-            ARCH=$ARCH \
-            SUBARCH=$SUBARCH \
-            CROSS_COMPILE=$CROSS_COMPILE \
-            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
-            -j$(nproc --all) \
-            2>&1 | tee "${{ github.workspace }}/logs/build.log"
+          if [ "$COMPILER" = "clang" ]; then
+            make \
+              O="$OUT_DIR" \
+              ARCH=$ARCH \
+              SUBARCH=$SUBARCH \
+              CC=clang \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+              LD=ld.lld \
+              AR=llvm-ar \
+              NM=llvm-nm \
+              STRIP=llvm-strip \
+              OBJCOPY=llvm-objcopy \
+              OBJDUMP=llvm-objdump \
+              -j$(nproc --all) \
+              2>&1 | tee "${{ github.workspace }}/logs/build.log"
+          else
+            make \
+              O="$OUT_DIR" \
+              ARCH=$ARCH \
+              SUBARCH=$SUBARCH \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+              -j$(nproc --all) \
+              2>&1 | tee "${{ github.workspace }}/logs/build.log"
+          fi
 
           BUILD_END=$(date +"%s")
-          BUILD_DIFF=$((BUILD_END - BUILD_START))
-          echo "BUILD_TIME=$(( BUILD_DIFF / 60 ))m $(( BUILD_DIFF % 60 ))s" >> $GITHUB_ENV
-          echo "✅ Build completed in $(( BUILD_DIFF / 60 ))m $(( BUILD_DIFF % 60 ))s"
+          DIFF=$((BUILD_END - BUILD_START))
+          echo "BUILD_TIME=$(( DIFF / 60 ))m $(( DIFF % 60 ))s" >> $GITHUB_ENV
+          echo "✅ Build finished in $(( DIFF / 60 ))m $(( DIFF % 60 ))s"
 
-      # ─────────────────────────────────────────────
-      # 10. Verify Kernel Output
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 12. Verify Output
+      # ──────────────────────────────────────────
       - name: ✅ Verify Kernel Output
-        id: verify
         run: |
           BOOT_DIR="$OUT_DIR/arch/arm64/boot"
           FOUND=0
-
           for img in Image Image.gz Image.gz-dtb Image-dtb; do
             if [ -f "$BOOT_DIR/$img" ]; then
-              echo "✅ Found: $img ($(du -sh $BOOT_DIR/$img | cut -f1))"
+              echo "✅ $img — $(du -sh $BOOT_DIR/$img | cut -f1)"
               FOUND=1
             fi
           done
+          [ $FOUND -eq 0 ] && echo "❌ No kernel image found!" && exit 1
 
-          if [ $FOUND -eq 0 ]; then
-            echo "❌ No kernel image found! Build may have failed."
-            exit 1
-          fi
-
-      # ─────────────────────────────────────────────
-      # 11. Package AnyKernel Zip
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 13. Package AnyKernel3
+      # ──────────────────────────────────────────
       - name: 📦 Package AnyKernel3 Zip
         run: |
-          # Clone AnyKernel3 if not present in CI repo
           if [ ! -d "$ANYKERNEL_DIR" ]; then
             git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$ANYKERNEL_DIR"
           fi
 
           BOOT_DIR="$OUT_DIR/arch/arm64/boot"
-
-          # Copy available kernel images
           for img in Image Image.gz Image.gz-dtb Image-dtb; do
             [ -f "$BOOT_DIR/$img" ] && cp "$BOOT_DIR/$img" "$ANYKERNEL_DIR/"
           done
 
-          # Copy DTBs if present
-          if [ -d "$BOOT_DIR/dts" ]; then
-            find "$BOOT_DIR/dts" -name "*.dtb" -exec cp {} "$ANYKERNEL_DIR/dtbs/" \; 2>/dev/null || true
-          fi
-
-          ZIP_NAME="Kernel-msm8937-GCC-$(date +%Y%m%d-%H%M)-${KERNEL_COMMIT_SHORT}.zip"
+          ZIP_NAME="Kernel-msm8937-${COMPILER}-$(date +%Y%m%d-%H%M)-${KERNEL_COMMIT_SHORT}.zip"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
           cd "$ANYKERNEL_DIR"
           zip -r9 "${{ github.workspace }}/$ZIP_NAME" . \
             -x '*.git*' -x 'README.md' -x '*placeholder'
 
-          echo "✅ AnyKernel zip created: $ZIP_NAME"
-          ls -lh "${{ github.workspace }}/$ZIP_NAME"
+          echo "✅ ZIP: $ZIP_NAME ($(du -sh ${{ github.workspace }}/$ZIP_NAME | cut -f1))"
 
-      # ─────────────────────────────────────────────
-      # 12. Upload Artifacts
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 14. Upload Artifacts
+      # ──────────────────────────────────────────
       - name: 📤 Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
@@ -293,9 +398,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      # ─────────────────────────────────────────────
-      # 13. Build Summary
-      # ─────────────────────────────────────────────
+      # ──────────────────────────────────────────
+      # 15. Build Summary
+      # ──────────────────────────────────────────
       - name: 📋 Build Summary
         if: always()
         run: |
@@ -308,9 +413,8 @@ jobs:
           echo "| **Version** | \`$KERNEL_VERSION\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`$KERNEL_COMMIT\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Defconfig** | \`$DEFCONFIG\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Compiler** | GCC (aarch64-linux-gnu) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Compiler** | \`$COMPILER\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Build Time** | \`$BUILD_TIME\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **KernelSU** | \`$ENABLE_KERNELSU\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **ccache** | \`$ENABLE_CCACHE\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **ZIP** | \`$ZIP_NAME\` |" >> $GITHUB_STEP_SUMMARY
           
