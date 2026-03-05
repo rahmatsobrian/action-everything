@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v3
 
       # ===============================
-      # Swap (kernel build butuh RAM besar)
+      # Set Swap
       # ===============================
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
@@ -56,25 +56,16 @@ jobs:
           rm kernel.zip
 
       # ===============================
-      # Fix deprecated prima driver
+      # Remove Deprecated Prima Driver
       # ===============================
-      - name: Remove Deprecated Prima Driver
+      - name: Remove Prima Driver
         run: |
           cd kernel
           sed -i 's|source "drivers/staging/prima/Kconfig"|# removed prima|' drivers/staging/Kconfig || true
           sed -i 's|obj-$(CONFIG_PRIMA_WLAN).*||' drivers/staging/Makefile || true
 
       # ===============================
-      # Download Defconfig
-      # ===============================
-      - name: Setup Defconfig
-        run: |
-          cd kernel
-          wget -O arch/arm64/configs/mi8937hos_defconfig \
-          https://raw.githubusercontent.com/rahmatsobrian/action-everything/main/mi8937hos_defconfig
-
-      # ===============================
-      # Show Compiler Info
+      # Show GCC Version
       # ===============================
       - name: GCC Info
         run: |
@@ -100,7 +91,7 @@ jobs:
           make O=out clean
           make O=out mrproper
 
-          make O=out ARCH=arm64 mi8937hos_defconfig
+          make O=out ARCH=arm64 msm8937-perf_defconfig
 
           START=$(date +%s)
 
@@ -116,7 +107,7 @@ jobs:
           echo "Build Time: $((END-START)) seconds"
 
       # ===============================
-      # Show Warning / Error Count
+      # Build Stats
       # ===============================
       - name: Build Statistics
         if: always()
@@ -128,7 +119,7 @@ jobs:
           grep -i error logs/build.log | wc -l || true
 
       # ===============================
-      # Upload Build Log
+      # Upload Log
       # ===============================
       - name: Upload Build Log
         if: always()
@@ -138,7 +129,7 @@ jobs:
           path: logs/build.log
 
       # ===============================
-      # Upload Kernel Image
+      # Upload Kernel
       # ===============================
       - name: Upload Image.gz
         if: success()
