@@ -37,11 +37,15 @@ jobs:
             dos2unix kmod
 
       # ===============================
-      # Clone kernel
+      # Download Kernel ZIP
       # ===============================
-      - name: Clone Kernel Source
+      - name: Download Kernel Source (ZIP)
         run: |
-          git clone --depth=1 -b mithorium/a14/master https://github.com/Mi-Thorium/kernel_msm-4.9.git kernel
+          wget https://github.com/Mi-Thorium/kernel_msm-4.9/archive/refs/heads/mithorium/a14/master.zip -O kernel.zip
+
+          unzip kernel.zip
+
+          mv kernel_msm-4.9-mithorium-a14-master kernel
 
       # ===============================
       # Download Defconfig
