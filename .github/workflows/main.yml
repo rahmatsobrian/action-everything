@@ -14,23 +14,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ========================
-      # Checkout repo
-      # ========================
+
       - name: Checkout
         uses: actions/checkout@v3
 
-      # ========================
-      # Swap (anti OOM)
-      # ========================
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 5
 
-      # ========================
-      # Install packages
-      # ========================
       - name: Install Packages
         run: |
           sudo apt-get update -y
@@ -44,16 +36,25 @@ jobs:
             zlib1g-dev libxml2 libxml2-utils \
             dos2unix kmod
 
-      # ========================
-      # Clone kernel source
-      # ========================
+      # ===============================
+      # Clone kernel
+      # ===============================
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 -b a13/master https://github.com/mi-msm8937/android_kernel_xiaomi_msm8937.git kernel
+          git clone --depth=1 -b mithorium/a14/master https://github.com/Mi-Thorium/kernel_msm-4.9.git kernel
 
-      # ========================
-      # Compile kernel
-      # ========================
+      # ===============================
+      # Download Defconfig
+      # ===============================
+      - name: Setup Defconfig
+        run: |
+          cd kernel
+          wget -O arch/arm64/configs/mi8937hos_defconfig \
+          https://raw.githubusercontent.com/rahmatsobrian/action-everything/main/mi8937hos_defconfig
+
+      # ===============================
+      # Compile Kernel
+      # ===============================
       - name: Compile Kernel
         run: |
           mkdir -p logs
@@ -69,14 +70,11 @@ jobs:
 
           cd kernel
 
-          # Clean build
           make O=out clean
           make O=out mrproper
 
-          # Defconfig
-          make O=out ARCH=arm64 msm8937_defconfig
+          make O=out ARCH=arm64 mi8937hos_defconfig
 
-          # Build
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
@@ -84,9 +82,9 @@ jobs:
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
             2>&1 | tee $GITHUB_WORKSPACE/logs/build.log
 
-      # ========================
-      # Upload log
-      # ========================
+      # ===============================
+      # Upload Log
+      # ===============================
       - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,9 +92,9 @@ jobs:
           name: build-log
           path: logs/build.log
 
-      # ========================
-      # Upload kernel image
-      # ========================
+      # ===============================
+      # Upload Kernel
+      # ===============================
       - name: Upload Image.gz
         if: success()
         uses: actions/upload-artifact@v4
