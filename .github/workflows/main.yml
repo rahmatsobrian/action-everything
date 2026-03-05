@@ -1,4 +1,4 @@
-name: Kernel Build
+name: Kernel Build GCC
 
 on:
   workflow_dispatch:
@@ -14,20 +14,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ========================
+      # Checkout repo
+      # ========================
       - name: Checkout
         uses: actions/checkout@v3
 
-      # ===============================
-      # Swap (biar compile ga OOM)
-      # ===============================
+      # ========================
+      # Swap (anti OOM)
+      # ========================
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 5
 
-      # ===============================
-      # Install dependencies
-      # ===============================
+      # ========================
+      # Install packages
+      # ========================
       - name: Install Packages
         run: |
           sudo apt-get update -y
@@ -36,40 +39,24 @@ jobs:
             build-essential bc bison flex perl python3 \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
             libncurses5-dev libssl-dev libelf-dev \
-            ccache clang llvm lld lldb \
+            ccache clang llvm lld \
             lzop pngcrush schedtool squashfs-tools xsltproc \
             zlib1g-dev libxml2 libxml2-utils \
             dos2unix kmod
 
-      # ===============================
-      # Clone Kernel Source
-      # ===============================
+      # ========================
+      # Clone kernel source
+      # ========================
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 -b a13/master https://github.com/mi-msm8937/android_kernel_xiaomi_msm8937.git kernel
 
-      # ===============================
-      # Setup ZYC Clang
-      # ===============================
-      - name: Setup ZYC Clang
-        run: |
-          mkdir clang-zyc
-          cd clang-zyc
-          wget -q $(curl -k https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-16-link.txt) -O zyc-clang.tar.gz
-          tar -xf zyc-clang.tar.gz
-          rm -f zyc-clang.tar.gz
-
-      # ===============================
-      # Start Kernel Compile
-      # ===============================
+      # ========================
+      # Compile kernel
+      # ========================
       - name: Compile Kernel
         run: |
           mkdir -p logs
-          
-          export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
-          export CLANG_DIR=$GITHUB_WORKSPACE/clang-zyc
-
-          export PATH=$CLANG_DIR/bin:$PATH
 
           export ARCH=arm64
           export SUBARCH=arm64
@@ -80,29 +67,26 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
-          cd $KERNEL_DIR
+          cd kernel
 
-          # Clean
+          # Clean build
           make O=out clean
           make O=out mrproper
 
           # Defconfig
           make O=out ARCH=arm64 msm8937_defconfig
 
-          # Compile
+          # Build
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
-            CC=clang \
-            LLVM=1 \
-            LLVM_IAS=1 \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
             2>&1 | tee $GITHUB_WORKSPACE/logs/build.log
 
-      # ===============================
-      # Upload Log
-      # ===============================
+      # ========================
+      # Upload log
+      # ========================
       - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
@@ -110,9 +94,9 @@ jobs:
           name: build-log
           path: logs/build.log
 
-      # ===============================
-      # Upload Kernel Image
-      # ===============================
+      # ========================
+      # Upload kernel image
+      # ========================
       - name: Upload Image.gz
         if: success()
         uses: actions/upload-artifact@v4
