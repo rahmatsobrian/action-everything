@@ -15,17 +15,26 @@ jobs:
 
     steps:
 
+      # ===============================
+      # Checkout
+      # ===============================
       - name: Checkout
         uses: actions/checkout@v3
 
+      # ===============================
+      # Swap (kernel build butuh RAM besar)
+      # ===============================
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 5
 
+      # ===============================
+      # Install Dependencies
+      # ===============================
       - name: Install Packages
         run: |
-          sudo apt-get update -y
+          sudo apt-get update
           sudo apt-get install -y \
             git curl wget zip unzip tar jq \
             build-essential bc bison flex perl python3 \
@@ -37,15 +46,23 @@ jobs:
             dos2unix kmod
 
       # ===============================
-      # Download Kernel ZIP
+      # Download Kernel Source
       # ===============================
-      - name: Download Kernel Source (ZIP)
+      - name: Download Kernel ZIP
         run: |
           wget https://github.com/Mi-Thorium/kernel_msm-4.9/archive/refs/heads/mithorium/a14/master.zip -O kernel.zip
-
           unzip kernel.zip
-
           mv kernel_msm-4.9-mithorium-a14-master kernel
+          rm kernel.zip
+
+      # ===============================
+      # Fix deprecated prima driver
+      # ===============================
+      - name: Remove Deprecated Prima Driver
+        run: |
+          cd kernel
+          sed -i 's|source "drivers/staging/prima/Kconfig"|# removed prima|' drivers/staging/Kconfig || true
+          sed -i 's|obj-$(CONFIG_PRIMA_WLAN).*||' drivers/staging/Makefile || true
 
       # ===============================
       # Download Defconfig
@@ -57,6 +74,13 @@ jobs:
           https://raw.githubusercontent.com/rahmatsobrian/action-everything/main/mi8937hos_defconfig
 
       # ===============================
+      # Show Compiler Info
+      # ===============================
+      - name: GCC Info
+        run: |
+          aarch64-linux-gnu-gcc --version
+
+      # ===============================
       # Compile Kernel
       # ===============================
       - name: Compile Kernel
@@ -65,7 +89,6 @@ jobs:
 
           export ARCH=arm64
           export SUBARCH=arm64
-
           export KBUILD_BUILD_USER=github
           export KBUILD_BUILD_HOST=actions
 
@@ -79,6 +102,8 @@ jobs:
 
           make O=out ARCH=arm64 mi8937hos_defconfig
 
+          START=$(date +%s)
+
           make -j$(nproc --all) \
             O=out \
             ARCH=arm64 \
@@ -86,8 +111,24 @@ jobs:
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
             2>&1 | tee $GITHUB_WORKSPACE/logs/build.log
 
+          END=$(date +%s)
+
+          echo "Build Time: $((END-START)) seconds"
+
       # ===============================
-      # Upload Log
+      # Show Warning / Error Count
+      # ===============================
+      - name: Build Statistics
+        if: always()
+        run: |
+          echo "Warnings:"
+          grep -i warning logs/build.log | wc -l || true
+
+          echo "Errors:"
+          grep -i error logs/build.log | wc -l || true
+
+      # ===============================
+      # Upload Build Log
       # ===============================
       - name: Upload Build Log
         if: always()
@@ -97,7 +138,7 @@ jobs:
           path: logs/build.log
 
       # ===============================
-      # Upload Kernel
+      # Upload Kernel Image
       # ===============================
       - name: Upload Image.gz
         if: success()
