@@ -24,9 +24,9 @@ on:
           - "clang"
           - "gcc"
       CLANG_VERSION:
-        description: "ZyCromerZ Clang version tag (e.g. 20.0.0git-20250101)"
+        description: "Versi Clang: 10, 11, 12, 13, 14, 15, 16, atau 'main' (default: main)"
         required: false
-        default: "latest"
+        default: "main"
       ENABLE_KERNELSU:
         description: "Enable KernelSU-Next?"
         required: true
@@ -109,51 +109,48 @@ jobs:
       - name: 🦾 Download ZyCromerZ Clang
         if: env.COMPILER == 'clang'
         run: |
-          echo "::group::Fetching ZyCromerZ Clang release info"
+          CLANG_VER="${{ github.event.inputs.CLANG_VERSION }}"
+          CLANG_VER="${CLANG_VER:-main}"   # default ke main jika kosong
 
-          ZYCROMERZ_API="https://api.github.com/repos/ZyCromerZ/Clang/releases"
+          BASE_RAW="https://raw.githubusercontent.com/ZyCromerZ/Clang/main"
+          LINK_FILE="Clang-${CLANG_VER}-link.txt"
+          LASTBUILD_FILE="Clang-${CLANG_VER}-lastbuild.txt"
 
-          if [ "${{ env.CLANG_VERSION }}" = "latest" ]; then
-            echo "📡 Fetching latest release..."
-            RELEASE_DATA=$(curl -sf "$ZYCROMERZ_API/latest")
-          else
-            echo "📡 Fetching release tag: ${{ env.CLANG_VERSION }}"
-            RELEASE_DATA=$(curl -sf "$ZYCROMERZ_API/tags/${{ env.CLANG_VERSION }}")
-          fi
-
-          # Extract tarball download URL (prefer .tar.gz)
-          CLANG_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' | head -1)
-          CLANG_TAG=$(echo "$RELEASE_DATA" | jq -r '.tag_name')
-          CLANG_NAME=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .name' | head -1)
+          echo "::group::Fetching download URL dari $LINK_FILE"
+          CLANG_URL=$(curl -sf "$BASE_RAW/$LINK_FILE" | tr -d '[:space:]')
 
           if [ -z "$CLANG_URL" ]; then
-            echo "❌ Could not find .tar.gz asset in release!"
+            echo "❌ Gagal fetch $LINK_FILE — versi '$CLANG_VER' mungkin tidak tersedia!"
+            echo "📋 Versi yang tersedia: 10, 11, 12, 13, 14, 15, 16, main"
             exit 1
           fi
 
-          echo "📦 Clang Tag    : $CLANG_TAG"
-          echo "📦 Asset Name   : $CLANG_NAME"
-          echo "🔗 Download URL : $CLANG_URL"
+          # Ambil info lastbuild (opsional, tidak fatal jika gagal)
+          CLANG_LASTBUILD=$(curl -sf "$BASE_RAW/$LASTBUILD_FILE" | tr -d '[:space:]' || echo "unknown")
+
+          echo "📦 Clang Version : $CLANG_VER"
+          echo "📅 Last Build    : $CLANG_LASTBUILD"
+          echo "🔗 Download URL  : $CLANG_URL"
           echo "::endgroup::"
 
-          echo "::group::Downloading and extracting Clang"
+          echo "::group::Downloading & Extracting Clang"
           mkdir -p "${{ github.workspace }}/clang"
-          curl -L "$CLANG_URL" | tar -xz -C "${{ github.workspace }}/clang" --strip-components=1
+          curl -L --progress-bar "$CLANG_URL" | \
+            tar -xz -C "${{ github.workspace }}/clang" --strip-components=1
           echo "::endgroup::"
 
-          # Export path so all subsequent steps can find it
+          # Export ke env
           CLANG_BIN="${{ github.workspace }}/clang/bin"
-          CLANG_LIB="${{ github.workspace }}/clang/lib"
+          echo "CLANG_DIR=${{ github.workspace }}/clang"    >> $GITHUB_ENV
+          echo "CLANG_BIN=$CLANG_BIN"                       >> $GITHUB_ENV
+          echo "CLANG_TAG=Clang-${CLANG_VER}-${CLANG_LASTBUILD}" >> $GITHUB_ENV
+          echo "PATH=$CLANG_BIN:$PATH"                      >> $GITHUB_ENV
 
-          echo "CLANG_DIR=${{ github.workspace }}/clang"  >> $GITHUB_ENV
-          echo "CLANG_BIN=$CLANG_BIN"                     >> $GITHUB_ENV
-          echo "PATH=$CLANG_BIN:$PATH"                    >> $GITHUB_ENV
-          echo "CLANG_TAG=$CLANG_TAG"                     >> $GITHUB_ENV
-
-          # Verify
+          # Verifikasi
           export PATH="$CLANG_BIN:$PATH"
-          echo "✅ Clang: $(clang --version | head -1)"
-          echo "✅ LLD  : $(ld.lld --version | head -1)"
+          echo "✅ Clang  : $(clang --version | head -1)"
+          echo "✅ LLD    : $(ld.lld --version 2>/dev/null | head -1 || echo 'not found')"
+          echo "✅ llvm-ar: $(llvm-ar --version 2>/dev/null | head -1 || echo 'not found')"
 
       # ──────────────────────────────────────────
       # 4b. Check GCC compatibility (if COMPILER=gcc)
