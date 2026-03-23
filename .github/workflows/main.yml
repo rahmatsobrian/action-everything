@@ -1,146 +1,21 @@
-name: Kernel Build GCC
+name: Check Runner Spec
 
 on:
   workflow_dispatch:
-  watch:
-    types: [started]
-
-defaults:
-  run:
-    shell: bash
+  push:
+    branches:
+      - main
 
 jobs:
-  buildtest:
+  check-spec:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      # ===============================
-      # Checkout
-      # ===============================
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      # ===============================
-      # Set Swap
-      # ===============================
-      - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 5
-
-      # ===============================
-      # Install Dependencies
-      # ===============================
-      - name: Install Packages
+      - name: Run Spec Checker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git curl wget zip unzip tar jq \
-            build-essential bc bison flex perl python3 \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            libncurses5-dev libssl-dev libelf-dev \
-            ccache clang llvm lld \
-            lzop pngcrush schedtool squashfs-tools xsltproc \
-            zlib1g-dev libxml2 libxml2-utils \
-            dos2unix kmod
-
-      # ===============================
-      # Download Kernel Source
-      # ===============================
-      - name: Download Kernel ZIP
-        run: |
-          wget https://github.com/Mi-Thorium/kernel_msm-4.9/archive/refs/heads/mithorium/a14/master.zip -O kernel.zip
-          unzip kernel.zip
-          mv kernel_msm-4.9-mithorium-a14-master kernel
-          rm kernel.zip
-
-      # ===============================
-      # Remove Deprecated Prima Driver
-      # ===============================
-      - name: Remove Prima Driver
-        run: |
-          cd kernel
-          sed -i 's|source "drivers/staging/prima/Kconfig"|# removed prima|' drivers/staging/Kconfig || true
-          sed -i 's|obj-$(CONFIG_PRIMA_WLAN).*||' drivers/staging/Makefile || true
-
-      # ===============================
-      # Show GCC Version
-      # ===============================
-      - name: GCC Info
-        run: |
-          aarch64-linux-gnu-gcc --version
-
-      # ===============================
-      # Compile Kernel
-      # ===============================
-      - name: Compile Kernel
-        run: |
-          mkdir -p logs
-
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export KBUILD_BUILD_USER=github
-          export KBUILD_BUILD_HOST=actions
-
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-
-          cd kernel
-
-          make O=out clean
-          make O=out mrproper
-
-          make O=out ARCH=arm64 msm8937-perf_defconfig
-
-          START=$(date +%s)
-
-          make -j$(nproc --all) \
-            O=out \
-            ARCH=arm64 \
-            CROSS_COMPILE=$CROSS_COMPILE \
-            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
-            2>&1 | tee $GITHUB_WORKSPACE/logs/build.log
-
-          END=$(date +%s)
-
-          echo "Build Time: $((END-START)) seconds"
-
-      # ===============================
-      # Build Stats
-      # ===============================
-      - name: Build Statistics
-        if: always()
-        run: |
-          echo "Warnings:"
-          grep -i warning logs/build.log | wc -l || true
-
-          echo "Errors:"
-          grep -i error logs/build.log | wc -l || true
-
-      # ===============================
-      # Upload Log
-      # ===============================
-      - name: Upload Build Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: logs/build.log
-
-      # ===============================
-      # Upload Kernel
-      # ===============================
-      - name: Upload Image.gz
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Image.gz
-          path: kernel/out/arch/arm64/boot/Image.gz
-
-      - name: Upload Image.gz-dtb
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Image.gz-dtb
-          path: kernel/out/arch/arm64/boot/Image.gz-dtb
+          chmod +x check_spec.sh
+          ./check_spec.sh
+          
