@@ -43,13 +43,12 @@ GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-N/A}"
 # Timestamp WIB
 TIMESTAMP=$(TZ=Asia/Jakarta date +"%d %B %Y, %H:%M:%S WIB")
 
-# ================= BUILD MESSAGE =================
-MESSAGE="🖥 *GitHub Actions Runner Spec*
+# ================= BUILD MESSAGE (HTML) =================
+MESSAGE="🖥 <b>GitHub Actions Runner Spec</b>
 
-🕒 *Time* : ${TIMESTAMP}
+🕒 <b>Time</b> : ${TIMESTAMP}
 
-\`\`\`
-[ OS & Kernel ]
+<pre>[ OS &amp; Kernel ]
 OS      : ${OS_NAME}
 Kernel  : ${KERNEL_VER}
 Arch    : ${ARCH}
@@ -80,13 +79,12 @@ GH Actions  : ${GITHUB_ACTIONS}
 Workflow    : ${GITHUB_WORKFLOW}
 Run ID      : ${GITHUB_RUN_ID}
 Actor       : ${GITHUB_ACTOR}
-Repository  : ${GITHUB_REPOSITORY}
-\`\`\`"
+Repository  : ${GITHUB_REPOSITORY}</pre>"
 
 # ================= SEND TO TELEGRAM =================
 curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-    -d chat_id="${TG_CHAT_ID}" \
-    -d parse_mode=Markdown \
-    -d text="${MESSAGE}"
+    --data-urlencode "chat_id=${TG_CHAT_ID}" \
+    --data-urlencode "parse_mode=HTML" \
+    --data-urlencode "text=${MESSAGE}"
 
 echo "[✓] Spec sent to Telegram."
