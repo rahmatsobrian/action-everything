@@ -1,21 +1,36 @@
-name: Check Runner Spec
+name: Inspect WeebX Clang
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
-  check-spec:
+  inspect:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout (optional)
         uses: actions/checkout@v4
 
-      - name: Run Spec Checker
+      - name: Download WeebX Clang
         run: |
-          chmod +x check_spec.sh
-          ./check_spec.sh
-          
+          wget -O weebx.tar.gz https://github.com/XSans0/WeebX-Clang/releases/download/WeebX-Clang-20.0.0git-release/WeebX-Clang-20.0.0git.tar.gz
+
+      - name: Extract Archive
+        run: |
+          mkdir extracted
+          tar -xvf weebx.tar.gz -C extracted
+
+      - name: Show Folder Structure
+        run: |
+          echo "===== STRUCTURE ====="
+          tree extracted || ls -R extracted
+
+      - name: Save Structure to File
+        run: |
+          tree extracted > structure.txt || ls -R extracted > structure.txt
+
+      - name: Upload Structure Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weebx-structure
+          path: structure.txt
