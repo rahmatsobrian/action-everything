@@ -1,36 +1,22 @@
-name: Inspect WeebX Clang
+name: Clone and Push to EXPERIMENTAL
 
 on:
   workflow_dispatch:
 
 jobs:
-  inspect:
+  clone-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (optional)
-        uses: actions/checkout@v4
-
-      - name: Download WeebX Clang
+      - name: Clone Source Repo
         run: |
-          wget -O weebx.tar.gz https://github.com/XSans0/WeebX-Clang/releases/download/WeebX-Clang-20.0.0git-release/WeebX-Clang-20.0.0git.tar.gz
-
-      - name: Extract Archive
-        run: |
-          mkdir extracted
-          tar -xvf weebx.tar.gz -C extracted
-
-      - name: Show Folder Structure
-        run: |
-          echo "===== STRUCTURE ====="
-          tree extracted || ls -R extracted
-
-      - name: Save Structure to File
-        run: |
-          tree extracted > structure.txt || ls -R extracted > structure.txt
-
-      - name: Upload Structure Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: weebx-structure
-          path: structure.txt
+          git clone https://github.com/rahmatsobrian/kernel_xiaomi_rolex_4.9.240.git kernel
+          cd kernel
+          git remote remove origin
+          git remote add origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/rahmatsobrian/EXPERIMENTALkernel_xiaomi_rolex_4.9.240.git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git branch -M main
+          git add -A
+          git commit -m "upload source" || echo "Nothing to commit"
+          git push -u origin main --force
