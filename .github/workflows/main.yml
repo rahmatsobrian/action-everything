@@ -1,4 +1,4 @@
-name: Clone and Push to EXPERIMENTAL
+name: Repo Cloner
 
 on:
   workflow_dispatch:
@@ -10,10 +10,10 @@ jobs:
     steps:
       - name: Clone Source Repo
         run: |
-          git clone https://github.com/rahmatsobrian/kernel_xiaomi_rolex_4.9.240.git kernel
+          git clone https://github.com/rahmatsobrian/kernel_xiaomi_vince_4.19.325.git kernel
           cd kernel
           git remote remove origin
-          git remote add origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/rahmatsobrian/EXPERIMENTALkernel_xiaomi_rolex_4.9.240.git
+          git remote add origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/rahmatsobrian/kernel_xiaomi_vince_ksu_4.19.325.git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git branch -M main
