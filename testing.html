@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siroha Keybox Collection</title>
+    <meta name="title" content="Siroha Keybox Collection">
+    <meta name="description" content="Gudang penyimpanan Keybox XML & ZIP terbaru. Selalu update dan siap digunakan untuk kebutuhan anda yg telah disediakan oleh Siroha.">
+    <meta name="keywords" content="Siroha, Keybox, XML Keybox, Play Integrity Fix, PIF, Android Modding, Root, Magisk, KernelSU">
+    <meta name="author" content="Rahmat Sobrian (Siroha)">
+    <meta name="theme-color" content="#2ecc71">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://shiroyukey.vercel.app/">
+    <meta property="og:title" content="Siroha Keybox Collection">
+    <meta property="og:description" content="Gudang penyimpanan Keybox XML & ZIP terbaru. Selalu update dan siap digunakan oleh pengguna.">
+    
+    <meta property="og:image" content="https://shiroyukey.vercel.app/banner.png">
+    
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="720">
+	
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --primary: #2ecc71;
+            --primary-glow: rgba(46, 204, 113, 0.4);
+            --warning: #ffb142;
+            --warning2: #2ecc71;
+            --danger: #ff4757;
+            --telegram: #fff;
+            --telegram2: #2AABEE;
+            --bg-dark: #0a0f0b;
+            --glass: rgba(46, 204, 113, 0.05);
+            --glass-border: rgba(46, 204, 113, 0.2);
+            --text-main: #e0f2f1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        body {
+            background: var(--bg-dark); color: var(--text-main); min-height: 100vh; overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(46, 204, 113, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(46, 204, 113, 0.08) 0%, transparent 40%);
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        nav {
+            position: sticky; top: 0; z-index: 100; padding: 1.2rem 5%; background: rgba(10, 15, 11, 0.85);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .logo {
+            font-weight: 800; font-size: 1.3rem; color: var(--primary); text-transform: uppercase;
+            letter-spacing: 2px; display: flex; align-items: center; gap: 8px;
+        }
+
+        .nav-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+        .nav-btn {
+            background: transparent; border: 1px solid var(--glass-border); color: var(--primary);
+            padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex;
+            align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; transition: 0.3s;
+            min-height: 38px;
+        }
+
+        .nav-btn:hover { background: var(--glass); border-color: var(--primary); }
+
+        .hero { text-align: center; padding: 3rem 5% 1rem; animation: fadeInDown 1s ease; }
+        .hero h1 {
+            font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .hero p { opacity: 0.7; font-size: 0.9rem; max-width: 600px; margin: 0 auto; }
+
+        .container {
+            padding: 1.5rem 5% 4rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px; align-items: stretch; 
+        }
+
+        .card {
+            background: var(--glass); 
+            backdrop-filter: blur(10px); 
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px; 
+            padding: 1.2rem; 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; 
+            flex-direction: column; 
+            position: relative; 
+            height: 100%; 
+            will-change: transform, opacity;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+
+        .card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 30px rgba(46, 204, 113, 0.1); }
+
+        .card-content { display: flex; align-items: flex-start; gap: 12px; flex: 1; margin-bottom: 12px; }
+
+        .icon-box {
+            background: rgba(46, 204, 113, 0.15); padding: 10px; border-radius: 10px;
+            color: var(--primary); flex-shrink: 0; display: flex; align-items: center;
+        }
+        .icon-box.zip-type { background: rgba(255, 177, 66, 0.15); color: var(--warning); }
+
+        .card-info { width: 100%; display: flex; flex-direction: column; }
+        .card-info h3 { font-size: 1rem; color: #fff; margin-bottom: 6px; white-space: normal; word-break: break-word; line-height: 1.3; }
+        .card-meta { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; opacity: 0.6; }
+        .meta-item { display: flex; align-items: center; gap: 5px; }
+
+        .card-actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+        .password-badge {
+            display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px;
+            background: rgba(255, 177, 66, 0.1); border: 1px dashed rgba(255, 177, 66, 0.4);
+            border-radius: 8px; font-size: 0.75rem; color: var(--warning); font-weight: 600; width: 100%; text-align: center;
+        }
+
+        .btn-row { display: flex; gap: 8px; }
+        .btn-action {
+            flex: 1; padding: 10px; border: none; border-radius: 10px; font-weight: 700; font-size: 0.8rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: 0.3s; text-decoration: none; font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-primary:hover { transform: scale(1.02); background: #fff; }
+        .btn-zip { background: var(--warning2); color: #000; }
+        .btn-zip:hover { transform: scale(1.02); background: #fff; }
+        .btn-telegram { background: rgba(42, 171, 238, 1.0); color: var(--telegram); }
+        .btn-telegram:hover { transform: scale(1.02); background: var(--telegram); color: #000; }
+
+        .status-container { grid-column: 1 / -1; text-align: center; padding: 2rem 5%; display: flex; flex-direction: column; align-items: center; }
+        .spinner {
+            width: 35px; height: 35px; border: 3px solid var(--glass-border);
+            border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+
+        .error-box {
+            background: rgba(255, 71, 87, 0.05); border: 1px solid rgba(255, 71, 87, 0.2);
+            border-radius: 16px; padding: 1.5rem; max-width: 400px; width: 100%; margin: 0 auto; backdrop-filter: blur(10px);
+        }
+        .error-box h2 { color: var(--danger); font-size: 1.3rem; margin: 8px 0; }
+        .error-box p { opacity: 0.8; font-size: 0.85rem; margin-bottom: 12px; line-height: 1.4; }
+
+        .timer-box {
+            background: rgba(255, 71, 87, 0.1); border: 1px dashed rgba(255, 71, 87, 0.4);
+            padding: 10px; border-radius: 10px; margin: 10px 0 15px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .timer-display { font-family: monospace; font-size: 2rem; font-weight: 800; color: var(--danger); letter-spacing: 2px; }
+        .timer-info { font-size: 0.8rem; opacity: 0.8; color: #fff; }
+
+        .section-title {
+            grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+            font-size: 1.25rem; font-weight: 800; color: var(--primary);
+            padding-bottom: 12px; margin-top: 10px; border-bottom: 1px dashed var(--glass-border);
+            animation: fadeInDown 0.5s ease;
+        }
+
+        .section-title.old { color: rgba(255, 255, 255, 0.5); margin-top: 1rem; border-bottom-color: rgba(255, 255, 255, 0.1); }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+            width: 100%; height: 100vh; height: 100dvh; 
+            background: rgba(10, 15, 11, 0.85);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); 
+            z-index: 1000; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        
+        .modal-content {
+            background: var(--bg-dark); border: 1px solid var(--glass-border); border-radius: 16px;
+            padding: 1.25rem; width: 90%; max-width: 400px; 
+            transform: translateY(20px); transition: transform 0.3s ease;
+            max-height: 85vh; 
+            display: flex; flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        
+        .modal-body { overflow-y: auto; padding-right: 6px; margin-bottom: 12px; overscroll-behavior: contain; }
+        .modal-body::-webkit-scrollbar { width: 4px; }
+        .modal-body::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 4px; }
+        .modal-body::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; }
+        .modal-close { background: transparent; border: none; color: #fff; cursor: pointer; opacity: 0.5; transition: 0.3s; padding: 4px; }
+        .modal-close:hover { opacity: 1; color: var(--danger); }
+        
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+        .form-group input {
+            background: rgba(46, 204, 113, 0.05); border: 1px solid var(--glass-border);
+            padding: 10px 12px; border-radius: 8px; color: #fff; outline: none; font-family: monospace;
+        }
+        .modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .btn-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 8px; flex: 1; cursor: pointer; transition: 0.3s; font-weight:600; }
+        .btn-outline:hover { background: rgba(255, 71, 87, 0.1); }
+        .btn-submit { background: var(--primary); border: none; color: #000; padding: 10px; border-radius: 8px; flex: 2; cursor: pointer; font-weight: 700; transition: 0.3s; }
+        .btn-submit:hover { transform: scale(1.02); background: #fff; }
+
+        .source-link-item {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+            color: #fff; text-decoration: none; transition: 0.3s; padding: 8px; border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02); border: 1px solid transparent; font-size: 0.85rem;
+        }
+        .source-link-item:hover { background: rgba(46, 204, 113, 0.1); border-color: var(--glass-border); color: var(--primary); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+
+        footer { padding: 1.5rem; text-align: center; border-top: 1px solid var(--glass-border); opacity: 0.6; font-size: 0.8rem; }
+
+        @media (max-width: 480px) {
+            .hide-mobile { display: none; }
+            nav { padding: 1rem 4%; } 
+            .logo { font-size: 1.15rem; gap: 6px; } 
+            .nav-actions { gap: 6px; } 
+            .nav-btn { 
+                padding: 6px 8px; 
+                font-size: 0.75rem; 
+                min-height: 32px; 
+                min-width: 32px; 
+                justify-content: center; 
+            } 
+            .card { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">
+            <i data-lucide="shield-check"></i> Siroha
+        </div>
+        <div class="nav-actions">
+            <button class="nav-btn" onclick="toggleNotifications()" id="notif-btn" title="Nyalakan Notifikasi">
+                <span id="notif-btn-content" style="display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">Notif Off</span>
+                </span>
+            </button>
+            <button class="nav-btn" onclick="toggleAboutModal()">
+                <i data-lucide="info" size="16"></i> <span class="hide-mobile">About</span>
+            </button>
+            <button class="nav-btn" onclick="toggleTokenModal()">
+                <i data-lucide="key" size="16"></i> <span id="token-status">Limit Standar</span>
+            </button>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <h1>Keybox Collection</h1>
+        <p>Penyimpanan Keybox XML & ZIP terbaru.</p>
+    </header>
+
+    <main class="container" id="keybox-grid"></main>
+
+    <footer>&copy; 2026 Rahmat Sobrian | #Nasgor aliases Siroha.</footer>
+
+    <div class="modal-overlay" id="about-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 8px; color: var(--primary);">
+                    <i data-lucide="info" size="18"></i> Tentang Website Ini
+                </h3>
+                <button class="modal-close" onclick="toggleAboutModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 12px; line-height: 1.5; color: #fff;">
+                    Website ini adalah tempat koleksi keybox yang saya dapat dari berbagai grup/channel yang ada di Telegram. Perlu diketahui bahwa file keybox yang tersedia disini adalah milik pembuat aslinya.
+                </p>
+                
+                <p style="font-size: 0.8rem; margin-bottom: 8px; opacity: 0.8; font-weight: 600; color: #fff;">🔗 Sumber & Pembuat:</p>
+                <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
+                    
+                    <a href="https://t.me/+xAZq3eIDNjI3MzI1" target="_blank" class="source-link-item">
+                        <i data-lucide="external-link" size="14" color="var(--primary)"></i> 
+                        <span><b>Don't buy!.xml</b> by Azmunaa</span>
+                    </a>
+                    
+                    <a href="https://t.me/yuriiroot" target="_blank" class="source-link-item">
+                        <i data-lucide="external-link" size="14" color="var(--primary)"></i> 
+                        <span><b>Yurikey.zip</b> by Yuri</span>
+                    </a>
+                    
+                    <a href="https://t.me/keyboxstrong" target="_blank" class="source-link-item">
+                        <i data-lucide="external-link" size="14" color="var(--primary)"></i> 
+                        <span><b>Evokerrkey.xml</b> by Evokerr</span>
+                    </a>
+                    
+                    <a href="https://t.me/aleisterprjkst" target="_blank" class="source-link-item">
+                        <i data-lucide="external-link" size="14" color="var(--primary)"></i> 
+                        <span><b>Keybox.xml</b> by Aleister Prjkst</span>
+                    </a>
+                    
+                    <div style="font-size: 0.75rem; color: #fff; opacity: 0.5; padding-left: 6px; margin-top: 2px;">
+                        ...dan sumber-sumber lainnya, serta saya juga sangat berterimakasih kepada para pembuat keybox yg ada.
+                    </div>
+                </div>
+
+                <div style="background: rgba(46, 204, 113, 0.1); border-left: 3px solid var(--primary); padding: 10px; border-radius: 6px; font-size: 0.8rem; color: #fff; line-height: 1.4;">
+                    <b>Misi:</b> Mengumpulkan file Keybox yang ada agar mudah diunduh <b>tanpa aplikasi Telegram.</b> Saya tetap menyarankan Anda untuk bergabung ke grup/channel pembuat keybox aslinya!
+                </div>
+            </div>
+
+            <div class="modal-actions" style="flex-direction: column; gap: 0;">
+                <button class="btn-submit" onclick="toggleAboutModal()" style="width: 100%;">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="token-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 6px; color: var(--primary);">
+                    <i data-lucide="settings" size="18"></i> API Settings
+                </h3>
+                <button class="modal-close" onclick="toggleTokenModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="modal-body" style="font-size: 0.85rem; color: #fff; opacity: 0.8; line-height: 1.5;">
+                Gunakan <b>Personal Access Token</b> GitHub untuk menaikkan limit dari 60 menjadi 5000 request/jam.<br><br>
+                <a href="https://github.com/settings/tokens/new" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">&rarr; Buat Token di sini</a>
+            </div>
+
+            <div class="form-group" style="margin-top: 10px;">
+                <input type="text" id="github-pat" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-outline" onclick="removeToken()">Hapus</button>
+                <button class="btn-submit" onclick="saveToken()">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const USER = 'rahmatsobrian';
+        const REPO = 'action-everything';
+        const API_CONTENTS_URL = `https://api.github.com/repos/${USER}/${REPO}/contents/`;
+        const TELEGRAM_CHANNEL = 'yuriiroot'; 
+        
+        // FITUR NOTIFIKASI: Key untuk menyimpan waktu terakhir file di cek
+        const NOTIF_TIME_KEY = 'siroha_latest_file_time';
+
+        let storedToken = localStorage.getItem('siroha_github_token') || '';
+        let countdownInterval;
+        const CACHE_KEY = 'siroha_date_cache';
+        let dateCache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
+
+        // FITUR NOTIFIKASI: Fungsi untuk update UI tombol Notifikasi
+        function updateNotifUI() {
+            const btnContent = document.getElementById('notif-btn-content');
+            if (!("Notification" in window)) {
+                btnContent.innerHTML = `<i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">No Support</span>`;
+                return;
+            }
+            if (Notification.permission === "granted") {
+                btnContent.innerHTML = `<i data-lucide="bell-ring" size="16" style="color: var(--primary)"></i> <span class="hide-mobile" style="color: var(--primary)">Notif On</span>`;
+            } else {
+                btnContent.innerHTML = `<i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">Notif Off</span>`;
+            }
+            lucide.createIcons();
+        }
+
+        // FITUR NOTIFIKASI: Fungsi untuk meminta izin Notifikasi
+        async function toggleNotifications() {
+            if (!("Notification" in window)) {
+                alert("Maaf, browser Anda tidak mendukung fitur notifikasi web.");
+                return;
+            }
+            if (Notification.permission === "granted") {
+                alert("Notifikasi sudah aktif! Anda akan otomatis diberi tahu jika ada Keybox baru.");
+                return;
+            }
+            
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                new Notification("Siroha Keybox", {
+                    body: "Sip! Notifikasi diaktifkan. Anda tidak akan ketinggalan update Keybox terbaru.",
+                    icon: "https://shiroyukey.vercel.app/banner.png"
+                });
+            } else if (permission === "denied") {
+                alert("Anda memblokir notifikasi. Izinkan melalui pengaturan situs di browser jika ingin mengaktifkannya nanti.");
+            }
+            updateNotifUI();
+        }
+
+        document.addEventListener('click', async function(e) {
+            const btn = e.target.closest('.btn-force-dl');
+            if (!btn) return;
+
+            e.preventDefault();
+            
+            const url = btn.getAttribute('data-url');
+            const filename = btn.getAttribute('data-filename');
+            const originalHTML = btn.innerHTML;
+            
+            try {
+                btn.innerHTML = `<i data-lucide="loader" class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin-bottom: 0;"></i> Proses...`;
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.7';
+                lucide.createIcons();
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Gagal mengakses data file.');
+                
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                window.URL.revokeObjectURL(blobUrl);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                console.error('Download gagal:', error);
+                window.open(url, '_blank');
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+                lucide.createIcons();
+            }
+        });
+
+        function updateTokenStatusUI() {
+            const statusSpan = document.getElementById('token-status');
+            const patInput = document.getElementById('github-pat');
+            if (storedToken) {
+                statusSpan.innerHTML = 'Token Aktif';
+                statusSpan.style.color = 'var(--primary)';
+                patInput.value = storedToken;
+            } else {
+                statusSpan.innerHTML = 'Limit Standar';
+                statusSpan.style.color = 'inherit';
+                patInput.value = '';
+            }
+        }
+        updateTokenStatusUI();
+
+        function checkModalsScroll() {
+            const isAnyModalActive = document.querySelector('.modal-overlay.active');
+            if (isAnyModalActive) {
+                document.body.classList.add('modal-open');
+            } else {
+                document.body.classList.remove('modal-open');
+            }
+        }
+
+        function toggleTokenModal() { 
+            document.getElementById('token-modal').classList.toggle('active'); 
+            checkModalsScroll();
+        }
+        
+        function toggleAboutModal() { 
+            document.getElementById('about-modal').classList.toggle('active'); 
+            checkModalsScroll();
+        }
+
+        function saveToken() {
+            const inputVal = document.getElementById('github-pat').value.trim();
+            if (inputVal) {
+                localStorage.setItem('siroha_github_token', inputVal); storedToken = inputVal;
+                clearInterval(countdownInterval); toggleTokenModal(); updateTokenStatusUI(); fetchKeyboxes();
+            }
+        }
+
+        function removeToken() {
+            localStorage.removeItem('siroha_github_token'); storedToken = '';
+            toggleTokenModal(); updateTokenStatusUI(); fetchKeyboxes();
+        }
+
+        async function fetchWithAuth(url) {
+            const headers = {};
+            if (storedToken) headers['Authorization'] = `token ${storedToken}`;
+            
+            const response = await fetch(url, { headers });
+            
+            if (response.status === 403 || response.status === 429) {
+                const resetTimeHeader = response.headers.get('x-ratelimit-reset');
+                const error = new Error('RATE_LIMIT');
+                error.resetTime = resetTimeHeader ? parseInt(resetTimeHeader) * 1000 : (new Date().getTime() + 3600000);
+                throw error;
+            }
+            if (!response.ok) throw new Error('FETCH_ERROR');
+            return response.json();
+        }
+
+        async function getFileDetails(path, fileSha) {
+            if (dateCache[fileSha]) return new Date(dateCache[fileSha]);
+
+            try {
+                const data = await fetchWithAuth(`https://api.github.com/repos/${USER}/${REPO}/commits?path=${path}&per_page=1`);
+                if (data && data.length > 0) {
+                    const commitDate = new Date(data[0].commit.committer.date);
+                    dateCache[fileSha] = commitDate.getTime();
+                    localStorage.setItem(CACHE_KEY, JSON.stringify(dateCache));
+                    return commitDate;
+                }
+                return new Date(0);
+            } catch (error) {
+                if (error.message === 'RATE_LIMIT') throw error; 
+                return new Date(0);
+            }
+        }
+
+        function startTimer(resetMs) {
+            clearInterval(countdownInterval);
+            const display = document.getElementById('timer-display');
+            if (!display) return;
+            
+            countdownInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const distance = resetMs - now;
+                
+                if (distance < 0) {
+                    clearInterval(countdownInterval); display.innerHTML = "00:00"; display.style.color = "var(--primary)";
+                    setTimeout(() => fetchKeyboxes(), 2000); return;
+                }
+                
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                display.innerHTML = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        async function fetchKeyboxes() {
+            const grid = document.getElementById('keybox-grid');
+            grid.innerHTML = `<div class="status-container" style="color: var(--primary);"><div class="spinner"></div><p style="font-size:0.9rem">Sinkronisasi data...</p></div>`;
+            
+            try {
+                const data = await fetchWithAuth(API_CONTENTS_URL);
+                const validFiles = data.filter(file => file.name.endsWith('.xml') || file.name.endsWith('.zip'));
+
+                if (validFiles.length === 0) {
+                    grid.innerHTML = '<div class="status-container"><p>Tidak ada file ditemukan.</p></div>';
+                    return;
+                }
+
+                const filesWithDates = await Promise.all(validFiles.map(async (file) => {
+                    const lastUpdated = await getFileDetails(file.path, file.sha);
+                    return { ...file, lastUpdated };
+                }));
+
+                filesWithDates.sort((a, b) => b.lastUpdated - a.lastUpdated);
+                grid.innerHTML = '';
+
+                // FITUR NOTIFIKASI: Logika untuk mendeteksi update dan mengirim notif
+                if (filesWithDates.length > 0) {
+                    const latestFileTime = filesWithDates[0].lastUpdated.getTime();
+                    const savedLastTime = parseInt(localStorage.getItem(NOTIF_TIME_KEY) || "0");
+
+                    // Jika ada file yg waktunya lebih baru dari riwayat penyimpanan & user mengizinkan notif
+                    if (latestFileTime > savedLastTime && savedLastTime !== 0 && Notification.permission === "granted") {
+                        const newFilesCount = filesWithDates.filter(f => f.lastUpdated.getTime() > savedLastTime).length;
+                        
+                        new Notification("🔥 Update Keybox Baru!", {
+                            body: `Ada ${newFilesCount} file keybox baru ditambahkan (Termasuk ${filesWithDates[0].name}). Silakan cek website!`,
+                            icon: "https://shiroyukey.vercel.app/banner.png"
+                        });
+                    }
+                    
+                    // Simpan waktu terbaru ke memori browser
+                    localStorage.setItem(NOTIF_TIME_KEY, latestFileTime.toString());
+                }
+
+                const newestTime = filesWithDates[0].lastUpdated.getTime(); 
+                const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000; 
+                const thresholdTime = newestTime - THREE_DAYS_MS; 
+
+                const newKeyboxes = [];
+                const oldKeyboxes = [];
+
+                filesWithDates.forEach(file => {
+                    if (file.lastUpdated.getTime() >= thresholdTime && file.lastUpdated.getTime() !== 0) {
+                        newKeyboxes.push(file);
+                    } else {
+                        oldKeyboxes.push(file);
+                    }
+                });
+
+                function createCardElement(file, index) {
+                    const isZip = file.name.endsWith('.zip');
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    
+                    let animDelay = Math.min(index * 0.05, 0.5);
+                    card.style.animation = `fadeInDown 0.4s ease forwards ${animDelay}s`;
+                    card.style.opacity = '0';
+
+                    const cleanName = file.name.replace(/\.(xml|zip)$/i, '');
+                    const sizeKB = (file.size / 1024).toFixed(2);
+                    
+                    let formattedDateTime = "Unknown";
+                    if (file.lastUpdated.getTime() !== 0) {
+                        formattedDateTime = file.lastUpdated.toLocaleString('id-ID', { 
+                            weekday: 'long', 
+                            day: 'numeric', 
+                            month: 'short', 
+                            year: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        }).replace(/\./g, ':').replace('pukul ', '');
+                    }
+
+                    const iconType = isZip ? 'file-archive' : 'file-code';
+                    const iconBoxClass = isZip ? 'icon-box zip-type' : 'icon-box';
+                    const telegramSearchUrl = `https://t.me/${TELEGRAM_CHANNEL}?q=${encodeURIComponent(cleanName)}`;
+
+                    const safeUrl = file.download_url.replace(/"/g, '&quot;');
+                    const safeName = file.name.replace(/"/g, '&quot;');
+
+                    let actionsHTML = isZip ? `
+                        <div class="password-badge"><i data-lucide="lock" size="12"></i> File Memiliki Password <br> Wajib Ekstrak Filenya Sebelum Digunakan</div>
+                        <div class="btn-row">
+                            <a href="${telegramSearchUrl}" target="_blank" class="btn-action btn-telegram"><i data-lucide="send" size="14"></i> Password</a>
+                            <button type="button" class="btn-action btn-zip btn-force-dl" data-url="${safeUrl}" data-filename="${safeName}">
+                                <i data-lucide="download" size="14"></i> Download
+                            </button>
+                        </div>
+                    ` : `
+                        <button type="button" class="btn-action btn-primary btn-force-dl" data-url="${safeUrl}" data-filename="${safeName}">
+                            <i data-lucide="download" size="14"></i> Download
+                        </button>
+                    `;
+
+                    card.innerHTML = `
+                        <div class="card-content">
+                            <div class="${iconBoxClass}"><i data-lucide="${iconType}"></i></div>
+                            <div class="card-info">
+                                <h3>${cleanName}</h3>
+                                <div class="card-meta">
+                                    <div class="meta-item"><i data-lucide="database" size="12"></i> ${sizeKB} KB</div>
+                                    <div class="meta-item"><i data-lucide="clock" size="12"></i> ${formattedDateTime}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-actions">${actionsHTML}</div>
+                    `;
+                    return card;
+                }
+
+                if (newKeyboxes.length > 0) {
+                    const titleBaru = document.createElement('div');
+                    titleBaru.className = 'section-title';
+                    titleBaru.innerHTML = '<i data-lucide="sparkles"></i> Update Baru';
+                    grid.appendChild(titleBaru);
+
+                    newKeyboxes.forEach((file, index) => {
+                        grid.appendChild(createCardElement(file, index));
+                    });
+                }
+
+                if (oldKeyboxes.length > 0) {
+                    const titleLama = document.createElement('div');
+                    titleLama.className = 'section-title old';
+                    titleLama.innerHTML = '<i data-lucide="history"></i> Arsip Lama';
+                    grid.appendChild(titleLama);
+
+                    oldKeyboxes.forEach((file, index) => {
+                        grid.appendChild(createCardElement(file, index + newKeyboxes.length));
+                    });
+                }
+
+                lucide.createIcons();
+
+            } catch (error) {
+                if (error.message === 'RATE_LIMIT') {
+                    let timerHTML = '';
+                    let shouldStartTimer = false;
+                    
+                    if (error.resetTime) {
+                        const resetDate = new Date(error.resetTime);
+                        const timeStr = resetDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                        timerHTML = `
+                            <div class="timer-box">
+                                <div class="timer-info">Mereset otomatis pada <b>${timeStr} WIB</b></div>
+                                <div class="timer-display" id="timer-display">--:--</div>
+                            </div>
+                        `;
+                        shouldStartTimer = true;
+                    }
+
+                    grid.innerHTML = `
+                        <div class="status-container">
+                            <div class="error-box">
+                                <i data-lucide="alert-triangle" size="40" style="color: var(--danger); margin-bottom: 8px;"></i>
+                                <h2>Limit Tercapai!</h2>
+                                <p>Batas GitHub API habis. Tunggu waktu selesai atau pasang Token.</p>
+                                ${timerHTML}
+                                <button onclick="toggleTokenModal()" class="btn-action btn-primary" style="margin-top: 10px; width: 100%;">
+                                    <i data-lucide="key" size="16"></i> Pasang Token
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    if (shouldStartTimer) {
+                        startTimer(error.resetTime);
+                    }
+                } else {
+                    grid.innerHTML = `<div class="status-container"><i data-lucide="wifi-off" size="40" style="color: var(--danger); margin-bottom: 10px;"></i><p style="color: #ff4757;">Terjadi kesalahan jaringan.</p></div>`;
+                }
+                lucide.createIcons();
+            }
+        }
+
+        // FITUR NOTIFIKASI: Panggil saat halaman pertama kali diload untuk menampilkan status saat ini
+        updateNotifUI();
+        lucide.createIcons();
+        fetchKeyboxes();
+    </script>
+</body>
+</html>
