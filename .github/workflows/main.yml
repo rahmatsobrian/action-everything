@@ -1,22 +1,28 @@
-name: Repo Cloner
+name: Auto Notif OneSignal
 
+# Script ini HANYA jalan kalau ada file berakhiran .xml atau .zip yang di-upload
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - '**.xml'
+      - '**.zip'
 
 jobs:
-  clone-and-push:
+  blast_notif:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Clone Source Repo
+      - name: Kirim Sinyal ke OneSignal
         run: |
-          git clone https://github.com/rahmatsobrian/kernel_xiaomi_vince_4.19.325.git kernel
-          cd kernel
-          git remote remove origin
-          git remote add origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/rahmatsobrian/kernel_xiaomi_vince_ksu_4.19.325.git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git branch -M main
-          git add -A
-          git commit -m "upload source" || echo "Nothing to commit"
-          git push -u origin main --force
+          curl --request POST \
+               --url https://onesignal.com/api/v1/notifications \
+               --header 'Authorization: Basic ${{ secrets.ONESIGNAL_REST_API_KEY }}' \
+               --header 'accept: application/json' \
+               --header 'content-type: application/json' \
+               --data '{
+                 "app_id": "${{ secrets.ONESIGNAL_APP_ID }}",
+                 "included_segments": ["Subscribed Users"],
+                 "headings": {"en": "🔥 Update Keybox Baru!"},
+                 "contents": {"en": "Siroha baru saja mengunggah file Keybox XML/ZIP terbaru ke server. Langsung sedot mans!"},
+                 "url": "https://siroevery.vercel.app/"
+               }'
+               
