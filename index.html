@@ -22,6 +22,19 @@
 	
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "fdda4b7d-35f0-4c58-a368-eaae0ae03421",
+          notifyButton: {
+            enable: true, // Memunculkan lonceng subscribe di pojok bawah
+          },
+        });
+      });
+    </script>
     
     <style>
         :root {
@@ -47,9 +60,7 @@
                 radial-gradient(circle at 90% 80%, rgba(46, 204, 113, 0.08) 0%, transparent 40%);
         }
 
-        body.modal-open {
-            overflow: hidden;
-        }
+        body.modal-open { overflow: hidden; }
 
         nav {
             position: sticky; top: 0; z-index: 100; padding: 1.2rem 5%; background: rgba(10, 15, 11, 0.85);
@@ -245,11 +256,6 @@
             <i data-lucide="shield-check"></i> Siroha
         </div>
         <div class="nav-actions">
-            <button class="nav-btn" onclick="toggleNotifications()" id="notif-btn" title="Nyalakan Notifikasi">
-                <span id="notif-btn-content" style="display: flex; align-items: center; gap: 6px;">
-                    <i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">Notif Off</span>
-                </span>
-            </button>
             <button class="nav-btn" onclick="toggleAboutModal()">
                 <i data-lucide="info" size="16"></i> <span class="hide-mobile">About</span>
             </button>
@@ -352,51 +358,10 @@
         const API_CONTENTS_URL = `https://api.github.com/repos/${USER}/${REPO}/contents/`;
         const TELEGRAM_CHANNEL = 'yuriiroot'; 
         
-        // FITUR NOTIFIKASI: Key untuk menyimpan waktu terakhir file di cek
-        const NOTIF_TIME_KEY = 'siroha_latest_file_time';
-
         let storedToken = localStorage.getItem('siroha_github_token') || '';
         let countdownInterval;
         const CACHE_KEY = 'siroha_date_cache';
         let dateCache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
-
-        // FITUR NOTIFIKASI: Fungsi untuk update UI tombol Notifikasi
-        function updateNotifUI() {
-            const btnContent = document.getElementById('notif-btn-content');
-            if (!("Notification" in window)) {
-                btnContent.innerHTML = `<i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">No Support</span>`;
-                return;
-            }
-            if (Notification.permission === "granted") {
-                btnContent.innerHTML = `<i data-lucide="bell-ring" size="16" style="color: var(--primary)"></i> <span class="hide-mobile" style="color: var(--primary)">Notif On</span>`;
-            } else {
-                btnContent.innerHTML = `<i data-lucide="bell-off" size="16"></i> <span class="hide-mobile">Notif Off</span>`;
-            }
-            lucide.createIcons();
-        }
-
-        // FITUR NOTIFIKASI: Fungsi untuk meminta izin Notifikasi
-        async function toggleNotifications() {
-            if (!("Notification" in window)) {
-                alert("Maaf, browser Anda tidak mendukung fitur notifikasi web.");
-                return;
-            }
-            if (Notification.permission === "granted") {
-                alert("Notifikasi sudah aktif! Anda akan otomatis diberi tahu jika ada Keybox baru.");
-                return;
-            }
-            
-            const permission = await Notification.requestPermission();
-            if (permission === "granted") {
-                new Notification("Siroha Keybox", {
-                    body: "Sip! Notifikasi diaktifkan. Anda tidak akan ketinggalan update Keybox terbaru.",
-                    icon: "https://shiroyukey.vercel.app/banner.png"
-                });
-            } else if (permission === "denied") {
-                alert("Anda memblokir notifikasi. Izinkan melalui pengaturan situs di browser jika ingin mengaktifkannya nanti.");
-            }
-            updateNotifUI();
-        }
 
         document.addEventListener('click', async function(e) {
             const btn = e.target.closest('.btn-force-dl');
@@ -501,7 +466,7 @@
                 error.resetTime = resetTimeHeader ? parseInt(resetTimeHeader) * 1000 : (new Date().getTime() + 3600000);
                 throw error;
             }
-            if (!response.ok) throw new Error('FETCH_ERROR');
+            if (!response.ok) throw new Error(`FETCH_ERROR: ${response.status}`);
             return response.json();
         }
 
@@ -509,7 +474,8 @@
             if (dateCache[fileSha]) return new Date(dateCache[fileSha]);
 
             try {
-                const data = await fetchWithAuth(`https://api.github.com/repos/${USER}/${REPO}/commits?path=${path}&per_page=1`);
+                // FIX BUG: Menggunakan encodeURIComponent agar file dengan spasi tidak bikin error API
+                const data = await fetchWithAuth(`https://api.github.com/repos/${USER}/${REPO}/commits?path=${encodeURIComponent(path)}&per_page=1`);
                 if (data && data.length > 0) {
                     const commitDate = new Date(data[0].commit.committer.date);
                     dateCache[fileSha] = commitDate.getTime();
@@ -519,7 +485,9 @@
                 return new Date(0);
             } catch (error) {
                 if (error.message === 'RATE_LIMIT') throw error; 
-                return new Date(0);
+                // FIX BUG: Jika 1 file gagal diload, jangan error total. Jadikan waktu default agar UI tetap muncul.
+                console.error("Gagal membaca tanggal untuk:", path);
+                return new Date(); 
             }
         }
 
@@ -549,6 +517,10 @@
             
             try {
                 const data = await fetchWithAuth(API_CONTENTS_URL);
+                
+                // Cek jika repo kosong atau salah URL
+                if (!Array.isArray(data)) throw new Error("Data tidak valid");
+
                 const validFiles = data.filter(file => file.name.endsWith('.xml') || file.name.endsWith('.zip'));
 
                 if (validFiles.length === 0) {
@@ -563,25 +535,6 @@
 
                 filesWithDates.sort((a, b) => b.lastUpdated - a.lastUpdated);
                 grid.innerHTML = '';
-
-                // FITUR NOTIFIKASI: Logika untuk mendeteksi update dan mengirim notif
-                if (filesWithDates.length > 0) {
-                    const latestFileTime = filesWithDates[0].lastUpdated.getTime();
-                    const savedLastTime = parseInt(localStorage.getItem(NOTIF_TIME_KEY) || "0");
-
-                    // Jika ada file yg waktunya lebih baru dari riwayat penyimpanan & user mengizinkan notif
-                    if (latestFileTime > savedLastTime && savedLastTime !== 0 && Notification.permission === "granted") {
-                        const newFilesCount = filesWithDates.filter(f => f.lastUpdated.getTime() > savedLastTime).length;
-                        
-                        new Notification("🔥 Update Keybox Baru!", {
-                            body: `Ada ${newFilesCount} file keybox baru ditambahkan (Termasuk ${filesWithDates[0].name}). Silakan cek website!`,
-                            icon: "https://shiroyukey.vercel.app/banner.png"
-                        });
-                    }
-                    
-                    // Simpan waktu terbaru ke memori browser
-                    localStorage.setItem(NOTIF_TIME_KEY, latestFileTime.toString());
-                }
 
                 const newestTime = filesWithDates[0].lastUpdated.getTime(); 
                 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000; 
@@ -719,13 +672,12 @@
                     }
                 } else {
                     grid.innerHTML = `<div class="status-container"><i data-lucide="wifi-off" size="40" style="color: var(--danger); margin-bottom: 10px;"></i><p style="color: #ff4757;">Terjadi kesalahan jaringan.</p></div>`;
+                    console.error(error); // Supaya error aslinya bisa di cek lewat Inspect Element (Console)
                 }
                 lucide.createIcons();
             }
         }
 
-        // FITUR NOTIFIKASI: Panggil saat halaman pertama kali diload untuk menampilkan status saat ini
-        updateNotifUI();
         lucide.createIcons();
         fetchKeyboxes();
     </script>
